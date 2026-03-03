@@ -1,0 +1,5 @@
+{
+  "name": "Checklist de Veículo Corporativo",
+  "description": "Aplicativo para checklist de entrega e devolução de veículos corporativos, com controle de condições, acessórios e termo de responsabilidade.",
+  "requestFramePermissions": ["camera"]
+}
