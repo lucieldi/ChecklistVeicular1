@@ -10,17 +10,19 @@ import {
   LogOut,
   Users,
   ClipboardList,
-  History
+  History,
+  Database
 } from 'lucide-react';
 import { User, ChecklistData } from './types';
 import Login from './components/Login';
 import UserManagement from './components/UserManagement';
 import Checklist from './components/Checklist';
 import ChecklistHistory from './components/ChecklistHistory';
+import Registrations from './components/Registrations';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [view, setView] = useState<'checklist' | 'history' | 'users'>('checklist');
+  const [view, setView] = useState<'checklist' | 'history' | 'users' | 'registrations'>('checklist');
   const [editingChecklistId, setEditingChecklistId] = useState<number | null>(null);
   const [editingChecklistData, setEditingChecklistData] = useState<ChecklistData | null>(null);
 
@@ -82,15 +84,26 @@ export default function App() {
                 Histórico
               </button>
               {user.role === 'admin' && (
-                <button 
-                  onClick={() => setView('users')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                    view === 'users' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'
-                  }`}
-                >
-                  <Users className="w-4 h-4" />
-                  Usuários
-                </button>
+                <>
+                  <button 
+                    onClick={() => setView('registrations')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                      view === 'registrations' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'
+                    }`}
+                  >
+                    <Database className="w-4 h-4" />
+                    Cadastros
+                  </button>
+                  <button 
+                    onClick={() => setView('users')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                      view === 'users' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'
+                    }`}
+                  >
+                    <Users className="w-4 h-4" />
+                    Usuários
+                  </button>
+                </>
               )}
             </div>
             
@@ -115,6 +128,7 @@ export default function App() {
           />
         )}
         {view === 'history' && <ChecklistHistory onEdit={handleEditChecklist} />}
+        {view === 'registrations' && <Registrations />}
         {view === 'users' && <UserManagement />}
       </main>
     </div>

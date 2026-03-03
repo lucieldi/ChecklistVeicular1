@@ -97,27 +97,10 @@ export default function Login({ onLogin }: LoginProps) {
               <span className="text-sm text-blue-100">Conformidade e auditoria digital</span>
             </div>
           </div>
-
-          <div className="mt-16 text-sm text-blue-200">
-            Novo na plataforma? <button type="button" onClick={() => { setIsRegistering(!isRegistering); setError(''); }} className="text-[#f59e0b] font-bold hover:underline">Criar conta</button>
-          </div>
         </div>
 
         {/* Right Panel */}
         <div className="w-full md:w-1/2 p-12 bg-[#2b6cb0] flex flex-col justify-center">
-          <div className="flex justify-center mb-8">
-            <img 
-              src="https://raw.githubusercontent.com/lucieldi/ajm-logo/main/ajm-logo.png" 
-              alt="Grupo AJM" 
-              className="h-20 object-contain"
-              referrerPolicy="no-referrer"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.src = "https://images.squarespace-cdn.com/content/v1/6351351543787722668e186a/eb71329a-5825-4c07-88d4-555355609653/AJM+Logo+2022+color+transparent.png";
-              }}
-            />
-          </div>
-          
           <h2 className="text-2xl font-bold text-white mb-8">
             {isRegistering ? 'Criar Conta' : 'Acesso ao Sistema'}
           </h2>
@@ -186,35 +169,6 @@ export default function Login({ onLogin }: LoginProps) {
             <CreditCard className="w-5 h-5" />
             Entrar com SSO Corporativo
           </button>
-
-          {/* Keep the example logins but style them to fit */}
-          <div className="mt-8 bg-black/10 p-4 rounded-xl border border-white/10 text-left space-y-3">
-            <p className="text-xs font-bold uppercase tracking-wider text-blue-200 text-center">Exemplos de Acesso</p>
-            
-            <div className="space-y-1">
-              <p className="text-xs font-bold text-white">Administrador</p>
-              <div className="flex justify-between text-xs">
-                <span className="text-blue-200">E-mail:</span>
-                <span className="font-mono text-white">admin@exemplo.com</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-blue-200">Senha:</span>
-                <span className="font-mono text-white">admin123</span>
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-white/10 space-y-1">
-              <p className="text-xs font-bold text-white">Usuário Comum</p>
-              <div className="flex justify-between text-xs">
-                <span className="text-blue-200">E-mail:</span>
-                <span className="font-mono text-white">user@exemplo.com</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-blue-200">Senha:</span>
-                <span className="font-mono text-white">user123</span>
-              </div>
-            </div>
-          </div>
 
           <p className="mt-6 text-xs text-blue-300 text-center">
             Acesso restrito a colaboradores autorizados.

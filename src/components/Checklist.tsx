@@ -66,13 +66,6 @@ const defaultInitialData: ChecklistData = {
   assinaturaResponsavel: '',
 };
 
-const EMPRESAS = [
-  { nome: 'AJM CONDOMINIOS', cnpj: '05.457.890/0001-89' },
-  { nome: 'PORTARE SERVICOS DE PORTARIA LTDA', cnpj: '31.369.594/0001-36' },
-  { nome: 'VILLA HUB CLEAN', cnpj: '27.936.075/0001-35' },
-  { nome: 'UNIQ SERVICOS DE LIMPEZA CONSERVACAO E PORTARIA LTDA', cnpj: '34.172.214/0001-67' }
-];
-
 interface ChecklistProps {
   editingId?: number | null;
   initialData?: ChecklistData | null;
@@ -83,6 +76,12 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
   const [data, setData] = useState<ChecklistData>(initialData || defaultInitialData);
   const [step, setStep] = useState(1);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+  
+  const [empresas, setEmpresas] = useState<any[]>([]);
+  const [colaboradores, setColaboradores] = useState<any[]>([]);
+  const [veiculos, setVeiculos] = useState<any[]>([]);
+
   const totalSteps = 6;
 
   useEffect(() => {
@@ -92,6 +91,12 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
       setData(defaultInitialData);
     }
   }, [initialData]);
+
+  useEffect(() => {
+    fetch('/api/empresas').then(res => res.json()).then(setEmpresas).catch(console.error);
+    fetch('/api/colaboradores').then(res => res.json()).then(setColaboradores).catch(console.error);
+    fetch('/api/veiculos').then(res => res.json()).then(setVeiculos).catch(console.error);
+  }, []);
 
   const updateField = (section: keyof ChecklistData, field: string, value: any) => {
     setData(prev => ({
@@ -183,15 +188,20 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
       
       const result = await response.json();
       if (result.success) {
-        alert('Checklist salvo com sucesso!');
-        setData(defaultInitialData);
-        setStep(1);
-        if (onFinish) onFinish();
+        setSaveStatus({ type: 'success', message: 'Checklist salvo com sucesso!' });
+        setTimeout(() => {
+          setSaveStatus(null);
+          setData(defaultInitialData);
+          setStep(1);
+          if (onFinish) onFinish();
+        }, 2000);
       } else {
-        alert('Erro ao salvar checklist: ' + result.message);
+        setSaveStatus({ type: 'error', message: 'Erro ao salvar checklist: ' + result.message });
+        setTimeout(() => setSaveStatus(null), 3000);
       }
     } catch (error) {
-      alert('Erro ao conectar ao servidor para salvar o checklist.');
+      setSaveStatus({ type: 'error', message: 'Erro ao conectar ao servidor para salvar o checklist.' });
+      setTimeout(() => setSaveStatus(null), 3000);
     }
   };
 
@@ -220,7 +230,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                     onChange={e => {
                       const val = e.target.value;
                       updateField('empresa', 'razaoSocial', val);
-                      const empresa = EMPRESAS.find(emp => emp.nome === val);
+                      const empresa = empresas.find(emp => emp.razaoSocial === val);
                       if (empresa) {
                         updateField('empresa', 'cnpj', empresa.cnpj);
                       } else {
@@ -229,8 +239,8 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                     }}
                   >
                     <option value="">Selecione uma empresa...</option>
-                    {EMPRESAS.map(emp => (
-                      <option key={emp.cnpj} value={emp.nome}>{emp.nome}</option>
+                    {empresas.map(emp => (
+                      <option key={emp.id} value={emp.razaoSocial}>{emp.razaoSocial}</option>
                     ))}
                   </select>
                 </div>
@@ -319,13 +329,34 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-1.5 lg:col-span-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Marca/Modelo</label>
-                  <input 
-                    type="text" 
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Veículo</label>
+                  <select 
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
                     value={data.veiculo.marcaModelo}
-                    onChange={e => updateField('veiculo', 'marcaModelo', e.target.value)}
-                  />
+                    onChange={e => {
+                      const val = e.target.value;
+                      updateField('veiculo', 'marcaModelo', val);
+                      const veiculo = veiculos.find(v => v.marcaModelo === val);
+                      if (veiculo) {
+                        updateField('veiculo', 'placa', veiculo.placa || '');
+                        updateField('veiculo', 'renavam', veiculo.renavam || '');
+                        updateField('veiculo', 'cor', veiculo.cor || '');
+                        updateField('veiculo', 'anoModelo', veiculo.anoModelo || '');
+                      } else {
+                        updateField('veiculo', 'placa', '');
+                        updateField('veiculo', 'renavam', '');
+                        updateField('veiculo', 'cor', '');
+                        updateField('veiculo', 'anoModelo', '');
+                      }
+                    }}
+                  >
+                    <option value="">Selecione um veículo...</option>
+                    {veiculos.map(v => (
+                      <option key={v.id} value={v.marcaModelo}>
+                        {v.marcaModelo}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Placa</label>
@@ -840,6 +871,22 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
           }
         }
       `}</style>
+
+      {saveStatus && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-bold shadow-xl ${
+              saveStatus.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+            }`}
+          >
+            {saveStatus.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+            {saveStatus.message}
+          </motion.div>
+        </div>
+      )}
 
       {isCameraOpen && (
         <CameraCapture 

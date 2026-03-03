@@ -25,6 +25,7 @@ export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
   const [checklists, setChecklists] = useState<ChecklistRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const fetchChecklists = async () => {
     try {
@@ -44,14 +45,19 @@ export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
   }, []);
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Tem certeza que deseja excluir este checklist?')) return;
+    if (deletingId !== id) {
+      setDeletingId(id);
+      return;
+    }
 
     try {
       await fetch(`/api/checklists/${id}`, { method: 'DELETE' });
+      setDeletingId(null);
       fetchChecklists();
     } catch (err) {
       console.error(err);
       setError('Erro ao excluir checklist');
+      setDeletingId(null);
     }
   };
 
@@ -130,10 +136,14 @@ export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
                 </button>
                 <button 
                   onClick={() => handleDelete(record.id)}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl font-bold transition-all"
+                  className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-bold transition-all ${
+                    deletingId === record.id 
+                      ? 'bg-red-600 text-white hover:bg-red-700' 
+                      : 'bg-red-50 text-red-600 hover:bg-red-100'
+                  }`}
                 >
                   <Trash2 className="w-4 h-4" />
-                  Excluir
+                  {deletingId === record.id ? 'Confirmar?' : 'Excluir'}
                 </button>
               </div>
             </div>
