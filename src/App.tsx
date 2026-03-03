@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { 
   Car, 
+  Truck,
   LogOut,
   Users,
   ClipboardList,
@@ -45,12 +46,12 @@ export default function App() {
       <header className="bg-white/80 backdrop-blur-md border-b border-zinc-200 px-6 py-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center">
-              <Car className="text-white w-6 h-6" />
+            <div className="w-10 h-10 bg-[var(--color-brand-blue-light)] rounded-xl flex items-center justify-center shadow-sm">
+              <Truck className="text-white w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-lg font-bold tracking-tight">Checklist Corporativo</h1>
-              <p className="text-xs text-zinc-500 font-medium uppercase tracking-widest">
+              <h1 className="text-lg font-bold tracking-tight text-zinc-900">Fleet<span className="text-[var(--color-brand-yellow)]">Check</span></h1>
+              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
                 {user.role === 'admin' ? 'Painel Administrativo' : 'Acesso Colaborador'}
               </p>
             </div>
@@ -65,7 +66,7 @@ export default function App() {
                   setView('checklist');
                 }}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                  view === 'checklist' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
+                  view === 'checklist' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'
                 }`}
               >
                 <ClipboardList className="w-4 h-4" />
@@ -74,7 +75,7 @@ export default function App() {
               <button 
                 onClick={() => setView('history')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                  view === 'history' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
+                  view === 'history' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'
                 }`}
               >
                 <History className="w-4 h-4" />
@@ -84,7 +85,7 @@ export default function App() {
                 <button 
                   onClick={() => setView('users')}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                    view === 'users' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
+                    view === 'users' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'
                   }`}
                 >
                   <Users className="w-4 h-4" />

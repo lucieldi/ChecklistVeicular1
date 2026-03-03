@@ -28,9 +28,15 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
         } else {
           setError('Nenhuma câmera encontrada no dispositivo.');
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error accessing camera:", err);
-        setError('Permissão de câmera negada ou erro ao acessar dispositivo.');
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          setError('Permissão negada. Clique no ícone de cadeado na barra de endereços do navegador, permita o acesso à câmera e recarregue a página.');
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          setError('Nenhuma câmera encontrada neste dispositivo.');
+        } else {
+          setError('Erro ao acessar a câmera: ' + (err.message || 'Erro desconhecido.'));
+        }
       }
     };
     getCameras();
@@ -135,7 +141,7 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
           <button 
             onClick={handleCapture}
             disabled={!!error}
-            className="flex items-center justify-center gap-2 px-8 py-3 bg-zinc-900 text-white rounded-xl font-semibold hover:bg-zinc-800 transition-all w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+            className="flex items-center justify-center gap-2 px-8 py-3 bg-[var(--color-brand-yellow)] text-zinc-900 rounded-xl font-bold hover:bg-[var(--color-brand-yellow-hover)] transition-all w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
           >
             <Camera className="w-5 h-5" />
             Tirar Foto

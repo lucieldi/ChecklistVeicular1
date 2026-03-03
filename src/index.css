@@ -3,10 +3,29 @@
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  
+  /* Map zinc to a custom blue scale based on the design */
+  --color-zinc-50: #f4f7fb;
+  --color-zinc-100: #e6eff8;
+  --color-zinc-200: #cddff1;
+  --color-zinc-300: #a3c6e6;
+  --color-zinc-400: #73a8d8;
+  --color-zinc-500: #4f8bc7;
+  --color-zinc-600: #366ea8;
+  --color-zinc-700: #2b5887;
+  --color-zinc-800: #1a365d; /* Dark blue from left card */
+  --color-zinc-900: #0f2a4a; /* Very dark blue for text */
+  --color-zinc-950: #0a1c33;
+
+  /* Custom brand colors */
+  --color-brand-yellow: #f5a623;
+  --color-brand-yellow-hover: #d97706;
+  --color-brand-blue-light: #2b6cb0;
+  --color-brand-blue-dark: #1a365d;
 }
 
 @layer base {
   body {
-    @apply font-sans antialiased;
+    @apply font-sans antialiased text-zinc-900 bg-zinc-50;
   }
 }

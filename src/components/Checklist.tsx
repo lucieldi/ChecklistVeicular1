@@ -20,6 +20,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ChecklistData } from '../types';
 import PrintView from './PrintView';
 import CameraCapture from './CameraCapture';
+import SignaturePad from './SignaturePad';
+import html2pdf from 'html2pdf.js';
 
 const defaultInitialData: ChecklistData = {
   empresa: { razaoSocial: '', cnpj: '' },
@@ -60,6 +62,8 @@ const defaultInitialData: ChecklistData = {
   combustivelEntrega: '',
   condicoesDevolucao: '',
   fotos: [],
+  assinaturaColaborador: '',
+  assinaturaResponsavel: '',
 };
 
 const EMPRESAS = [
@@ -144,7 +148,26 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
   };
 
   const handlePrint = () => {
-    window.print();
+    const element = document.getElementById('print-view');
+    if (!element) return;
+
+    // Temporarily make the print view visible for PDF generation
+    element.classList.remove('hidden');
+    element.classList.add('block');
+
+    const opt = {
+      margin: 10,
+      filename: `checklist-${data.veiculo.placa || 'veiculo'}.pdf`,
+      image: { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
+    };
+
+    html2pdf().set(opt).from(element).save().then(() => {
+      // Hide it again after generation
+      element.classList.remove('block');
+      element.classList.add('hidden');
+    });
   };
 
   const handleSave = async () => {
@@ -581,7 +604,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                     onClick={() => setData(prev => ({ ...prev, combustivelEntrega: level as any }))}
                     className={`px-6 py-3 rounded-xl border transition-all text-sm font-medium ${
                       data.combustivelEntrega === level 
-                      ? 'bg-zinc-900 text-white border-zinc-900 shadow-md' 
+                      ? 'bg-[var(--color-brand-yellow)] text-zinc-900 border-[var(--color-brand-yellow)] shadow-md' 
                       : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400'
                     }`}
                   >
@@ -632,7 +655,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                 <div className="flex flex-wrap gap-4">
                   <button 
                     onClick={() => setIsCameraOpen(true)}
-                    className="flex items-center justify-center gap-2 px-6 py-3 bg-zinc-900 text-white rounded-xl font-semibold hover:bg-zinc-800 transition-all cursor-pointer shadow-md"
+                    className="flex items-center justify-center gap-2 px-6 py-3 bg-[var(--color-brand-yellow)] text-zinc-900 rounded-xl font-semibold hover:bg-[var(--color-brand-yellow-hover)] transition-all cursor-pointer shadow-md"
                   >
                     <Camera className="w-5 h-5" />
                     Tirar Foto
@@ -690,13 +713,21 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-8">
-                <div className="space-y-4">
-                  <div className="h-px bg-zinc-300 w-full"></div>
+                <div className="space-y-4 flex flex-col items-center">
+                  <SignaturePad 
+                    initialSignature={data.assinaturaColaborador}
+                    onSave={(sig) => updateField('assinaturaColaborador', '', sig)} 
+                  />
+                  <div className="h-px bg-zinc-300 w-full max-w-md mt-2"></div>
                   <p className="text-center text-xs font-bold uppercase tracking-widest text-zinc-400">Assinatura do Colaborador</p>
                   <p className="text-center text-sm text-zinc-900 font-medium">{data.colaborador.nome || 'Nome do Colaborador'}</p>
                 </div>
-                <div className="space-y-4">
-                  <div className="h-px bg-zinc-300 w-full"></div>
+                <div className="space-y-4 flex flex-col items-center">
+                  <SignaturePad 
+                    initialSignature={data.assinaturaResponsavel}
+                    onSave={(sig) => updateField('assinaturaResponsavel', '', sig)} 
+                  />
+                  <div className="h-px bg-zinc-300 w-full max-w-md mt-2"></div>
                   <p className="text-center text-xs font-bold uppercase tracking-widest text-zinc-400">Assinatura do Responsável Empresa</p>
                   <p className="text-center text-sm text-zinc-900 font-medium">{data.empresa.razaoSocial || 'Nome da Empresa'}</p>
                 </div>
@@ -719,7 +750,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
               </button>
               <button 
                 onClick={handleSave}
-                className="flex items-center justify-center gap-2 px-8 py-4 bg-zinc-900 text-white rounded-2xl font-semibold hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-200"
+                className="flex items-center justify-center gap-2 px-8 py-4 bg-[var(--color-brand-yellow)] text-zinc-900 rounded-2xl font-bold hover:bg-[var(--color-brand-yellow-hover)] transition-all shadow-lg shadow-zinc-200"
               >
                 <Save className="w-5 h-5" />
                 Finalizar e Salvar
@@ -773,7 +804,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
             {step < totalSteps && (
               <button
                 onClick={() => setStep(s => s + 1)}
-                className="flex items-center gap-2 px-8 py-3 bg-zinc-900 text-white rounded-2xl font-semibold hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-200"
+                className="flex items-center gap-2 px-8 py-3 bg-[var(--color-brand-yellow)] text-zinc-900 rounded-2xl font-bold hover:bg-[var(--color-brand-yellow-hover)] transition-all shadow-lg shadow-zinc-200"
               >
                 Próximo
                 <ChevronRight className="w-5 h-5" />

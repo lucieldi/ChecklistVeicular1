@@ -76,4 +76,6 @@ export interface ChecklistData {
   combustivelEntrega: 'Cheio' | '3/4' | '2/4' | '1/4' | 'Reserva' | '';
   condicoesDevolucao: string;
   fotos?: string[];
+  assinaturaColaborador?: string;
+  assinaturaResponsavel?: string;
 }

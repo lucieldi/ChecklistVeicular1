@@ -131,7 +131,7 @@ export default function UserManagement() {
         </div>
         <button 
           onClick={handleOpenAdd}
-          className="flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-200"
+          className="flex items-center gap-2 px-6 py-3 bg-[var(--color-brand-yellow)] text-zinc-900 rounded-2xl font-bold hover:bg-[var(--color-brand-yellow-hover)] transition-all shadow-lg shadow-zinc-200"
         >
           <UserPlus className="w-5 h-5" />
           Novo Usuário
@@ -168,7 +168,7 @@ export default function UserManagement() {
                 <td className="px-6 py-4">
                   <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
                     user.role === 'admin' 
-                    ? 'bg-zinc-900 text-white' 
+                    ? 'bg-[var(--color-brand-yellow)] text-zinc-900' 
                     : 'bg-zinc-100 text-zinc-600'
                   }`}>
                     {user.role === 'admin' && <Shield className="w-3 h-3" />}
@@ -261,7 +261,7 @@ export default function UserManagement() {
                       onClick={() => setRole('common')}
                       className={`px-4 py-3 rounded-2xl border font-bold text-sm transition-all ${
                         role === 'common' 
-                        ? 'bg-zinc-900 text-white border-zinc-900' 
+                        ? 'bg-[var(--color-brand-yellow)] text-zinc-900 border-[var(--color-brand-yellow)]' 
                         : 'bg-white text-zinc-500 border-zinc-200 hover:border-zinc-400'
                       }`}
                     >
@@ -272,7 +272,7 @@ export default function UserManagement() {
                       onClick={() => setRole('admin')}
                       className={`px-4 py-3 rounded-2xl border font-bold text-sm transition-all ${
                         role === 'admin' 
-                        ? 'bg-zinc-900 text-white border-zinc-900' 
+                        ? 'bg-[var(--color-brand-yellow)] text-zinc-900 border-[var(--color-brand-yellow)]' 
                         : 'bg-white text-zinc-500 border-zinc-200 hover:border-zinc-400'
                       }`}
                     >
@@ -284,7 +284,7 @@ export default function UserManagement() {
                 <button 
                   type="submit"
                   disabled={submitting}
-                  className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-200 flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-[var(--color-brand-yellow)] text-zinc-900 rounded-2xl font-bold hover:bg-[var(--color-brand-yellow-hover)] transition-all shadow-lg shadow-zinc-200 flex items-center justify-center gap-2"
                 >
                   {submitting ? (
                     <Loader2 className="w-5 h-5 animate-spin" />

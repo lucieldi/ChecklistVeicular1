@@ -7,7 +7,7 @@ interface PrintViewProps {
 
 export default function PrintView({ data }: PrintViewProps) {
   return (
-    <div className="hidden print:block p-8 bg-white max-w-[210mm] mx-auto text-sm text-zinc-900">
+    <div id="print-view" className="hidden print:block p-8 bg-white max-w-[210mm] mx-auto text-sm text-zinc-900">
       <div className="text-center mb-8 border-b-2 border-zinc-900 pb-4">
         <h1 className="text-2xl font-bold uppercase tracking-widest">Checklist de Veículo</h1>
         <p className="text-zinc-500 mt-1">Termo de Responsabilidade e Vistoria</p>
