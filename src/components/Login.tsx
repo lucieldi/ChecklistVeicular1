@@ -154,21 +154,6 @@ export default function Login({ onLogin }: LoginProps) {
               {!loading && <ArrowRight className="w-5 h-5" />}
             </button>
           </form>
-
-          <div className="mt-8 flex items-center gap-4">
-            <div className="h-px bg-white/20 flex-1"></div>
-            <span className="text-blue-200 text-sm">ou</span>
-            <div className="h-px bg-white/20 flex-1"></div>
-          </div>
-
-          <button className="mt-8 w-full py-3.5 bg-white/10 border border-white/20 text-white rounded-xl font-medium hover:bg-white/20 transition-all flex items-center justify-center gap-2">
-            <CreditCard className="w-5 h-5" />
-            Entrar com SSO Corporativo
-          </button>
-
-          <p className="mt-6 text-xs text-blue-300 text-center">
-            Acesso restrito a colaboradores autorizados.
-          </p>
         </div>
       </motion.div>
     </div>
