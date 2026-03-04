@@ -29,7 +29,7 @@ export default function SignaturePad({ onSave, initialSignature }: SignaturePadP
     if (sigCanvas.current) {
       if (!sigCanvas.current.isEmpty()) {
         setHasSignature(true);
-        onSave(sigCanvas.current.getTrimmedCanvas().toDataURL('image/png'));
+        onSave(sigCanvas.current.getCanvas().toDataURL('image/png'));
       } else {
         setHasSignature(false);
         onSave('');

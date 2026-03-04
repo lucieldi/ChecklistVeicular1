@@ -43,18 +43,16 @@ export default function Login({ onLogin }: LoginProps) {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#154b85] p-6 relative overflow-hidden">
-      {/* Grid background effect */}
+      {/* Background Image */}
       <div 
-        className="absolute inset-0 opacity-20" 
+        className="absolute inset-0 opacity-20 bg-cover bg-center" 
         style={{ 
-          backgroundImage: 'linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px)', 
-          backgroundSize: '100px 100px',
-          backgroundPosition: 'center center'
+          backgroundImage: 'url("https://static.wixstatic.com/media/3ef599_c1d5910aa5c34e4989dee739444ceb14f000.jpg/v1/fill/w_1208,h_621,al_c,q_85,usm_0.33_1.00_0.00,enc_avif,quality_auto/3ef599_c1d5910aa5c34e4989dee739444ceb14f000.jpg")', 
         }}
       ></div>
       
       {/* Radial gradient overlay */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,#0f3866_100%)]"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,#0f3866_100%)] opacity-80"></div>
       
       <motion.div 
         initial={{ opacity: 0, y: 20 }}

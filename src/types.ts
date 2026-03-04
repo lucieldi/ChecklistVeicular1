@@ -6,6 +6,7 @@ export interface User {
 
 export interface ChecklistData {
   empresa: {
+    id?: number;
     razaoSocial: string;
     cnpj: string;
   };
@@ -17,6 +18,7 @@ export interface ChecklistData {
     validadeCnh: string;
   };
   veiculo: {
+    id?: number;
     marcaModelo: string;
     placa: string;
     renavam: string;

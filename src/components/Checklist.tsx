@@ -226,21 +226,24 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Razão Social</label>
                   <select 
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
-                    value={data.empresa.razaoSocial}
+                    value={data.empresa.id || data.empresa.razaoSocial}
                     onChange={e => {
                       const val = e.target.value;
-                      updateField('empresa', 'razaoSocial', val);
-                      const empresa = empresas.find(emp => emp.razaoSocial === val);
+                      const empresa = empresas.find(emp => emp.id.toString() === val || emp.razaoSocial === val);
                       if (empresa) {
+                        updateField('empresa', 'id', empresa.id);
+                        updateField('empresa', 'razaoSocial', empresa.razaoSocial);
                         updateField('empresa', 'cnpj', empresa.cnpj);
                       } else {
+                        updateField('empresa', 'id', undefined);
+                        updateField('empresa', 'razaoSocial', val);
                         updateField('empresa', 'cnpj', '');
                       }
                     }}
                   >
                     <option value="">Selecione uma empresa...</option>
                     {empresas.map(emp => (
-                      <option key={emp.id} value={emp.razaoSocial}>{emp.razaoSocial}</option>
+                      <option key={emp.id} value={emp.id}>{emp.razaoSocial}</option>
                     ))}
                   </select>
                 </div>
@@ -332,17 +335,20 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Veículo</label>
                   <select 
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
-                    value={data.veiculo.marcaModelo}
+                    value={data.veiculo.id || data.veiculo.marcaModelo}
                     onChange={e => {
                       const val = e.target.value;
-                      updateField('veiculo', 'marcaModelo', val);
-                      const veiculo = veiculos.find(v => v.marcaModelo === val);
+                      const veiculo = veiculos.find(v => v.id.toString() === val || v.marcaModelo === val);
                       if (veiculo) {
+                        updateField('veiculo', 'id', veiculo.id);
+                        updateField('veiculo', 'marcaModelo', veiculo.marcaModelo);
                         updateField('veiculo', 'placa', veiculo.placa || '');
                         updateField('veiculo', 'renavam', veiculo.renavam || '');
                         updateField('veiculo', 'cor', veiculo.cor || '');
                         updateField('veiculo', 'anoModelo', veiculo.anoModelo || '');
                       } else {
+                        updateField('veiculo', 'id', undefined);
+                        updateField('veiculo', 'marcaModelo', val);
                         updateField('veiculo', 'placa', '');
                         updateField('veiculo', 'renavam', '');
                         updateField('veiculo', 'cor', '');
@@ -352,7 +358,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   >
                     <option value="">Selecione um veículo...</option>
                     {veiculos.map(v => (
-                      <option key={v.id} value={v.marcaModelo}>
+                      <option key={v.id} value={v.id}>
                         {v.marcaModelo}
                       </option>
                     ))}
