@@ -48,11 +48,13 @@ export default function App() {
       <header className="bg-white/80 backdrop-blur-md border-b border-zinc-200 px-6 py-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[var(--color-brand-blue-light)] rounded-xl flex items-center justify-center shadow-sm">
-              <Truck className="text-white w-6 h-6" />
-            </div>
+            <img 
+              src="https://i.ibb.co/LzN2Yg1Z/logo.png" 
+              alt="FleetCheck Logo" 
+              className="h-10 w-auto"
+              referrerPolicy="no-referrer"
+            />
             <div>
-              <h1 className="text-lg font-bold tracking-tight text-zinc-900">Fleet<span className="text-[var(--color-brand-yellow)]">Check</span></h1>
               <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
                 {user.role === 'admin' ? 'Painel Administrativo' : 'Acesso Colaborador'}
               </p>

@@ -101,10 +101,6 @@ export default function Login({ onLogin }: LoginProps) {
 
         {/* Right Panel */}
         <div className="w-full md:w-1/2 p-12 bg-[#2b6cb0] flex flex-col justify-center">
-          <h2 className="text-2xl font-bold text-white mb-8">
-            {isRegistering ? 'Criar Conta' : 'Acesso ao Sistema'}
-          </h2>
-
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="relative">
               <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-400" />
