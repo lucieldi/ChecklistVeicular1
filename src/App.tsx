@@ -11,7 +11,8 @@ import {
   Users,
   ClipboardList,
   History,
-  Database
+  Database,
+  FileText
 } from 'lucide-react';
 import { User, ChecklistData } from './types';
 import Login from './components/Login';
@@ -19,10 +20,11 @@ import UserManagement from './components/UserManagement';
 import Checklist from './components/Checklist';
 import ChecklistHistory from './components/ChecklistHistory';
 import Registrations from './components/Registrations';
+import Reports from './components/Reports';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [view, setView] = useState<'checklist' | 'history' | 'users' | 'registrations'>('checklist');
+  const [view, setView] = useState<'checklist' | 'history' | 'users' | 'registrations' | 'reports'>('checklist');
   const [editingChecklistId, setEditingChecklistId] = useState<number | null>(null);
   const [editingChecklistData, setEditingChecklistData] = useState<ChecklistData | null>(null);
 
@@ -88,6 +90,15 @@ export default function App() {
               {user.role === 'admin' && (
                 <>
                   <button 
+                    onClick={() => setView('reports')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                      view === 'reports' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'
+                    }`}
+                  >
+                    <FileText className="w-4 h-4" />
+                    Relatórios
+                  </button>
+                  <button 
                     onClick={() => setView('registrations')}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
                       view === 'registrations' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'
@@ -130,6 +141,7 @@ export default function App() {
           />
         )}
         {view === 'history' && <ChecklistHistory onEdit={handleEditChecklist} />}
+        {view === 'reports' && <Reports />}
         {view === 'registrations' && <Registrations />}
         {view === 'users' && <UserManagement />}
       </main>
