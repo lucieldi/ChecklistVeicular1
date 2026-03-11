@@ -70,48 +70,48 @@ export default function Login({ onLogin }: LoginProps) {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-5xl bg-[#1a3b5c] rounded-3xl shadow-2xl flex flex-col md:flex-row overflow-hidden relative z-10"
+        className="w-full max-w-5xl bg-[#1a3b5c] rounded-3xl shadow-2xl flex flex-col md:flex-row overflow-hidden relative z-10 max-h-[90vh] md:max-h-none overflow-y-auto md:overflow-visible"
       >
         {/* Left Panel */}
-        <div className="w-full md:w-1/2 p-12 flex flex-col justify-center items-center text-white bg-[#1a3b5c]">
-          <div className="w-20 h-20 bg-[#3b82f6] rounded-3xl flex items-center justify-center mb-6 shadow-lg">
-            <Truck className="text-white w-10 h-10" />
+        <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center items-center text-white bg-[#1a3b5c]">
+          <div className="w-16 h-16 md:w-20 md:h-20 bg-[#3b82f6] rounded-2xl md:rounded-3xl flex items-center justify-center mb-4 md:mb-6 shadow-lg">
+            <Truck className="text-white w-8 h-8 md:w-10 md:h-10" />
           </div>
-          <h1 className="text-4xl font-bold mb-2">
+          <h1 className="text-3xl md:text-4xl font-bold mb-1 md:mb-2">
             Fleet<span className="text-[#f59e0b]">Check</span>
           </h1>
-          <p className="text-blue-200 text-sm tracking-widest uppercase mb-12 font-medium">Checklist Veicular Corporativo</p>
+          <p className="text-blue-200 text-[10px] md:text-sm tracking-widest uppercase mb-8 md:mb-12 font-medium">Checklist Veicular Corporativo</p>
 
-          <div className="space-y-6 w-full max-w-sm">
-            <div className="flex items-center gap-4">
-              <div className="w-8 h-8 rounded-full border border-blue-400/30 flex items-center justify-center bg-blue-400/10 shrink-0">
-                <Check className="w-4 h-4 text-[#f59e0b]" />
+          <div className="hidden sm:block space-y-4 md:space-y-6 w-full max-w-sm">
+            <div className="flex items-center gap-3 md:gap-4">
+              <div className="w-7 h-7 md:w-8 md:h-8 rounded-full border border-blue-400/30 flex items-center justify-center bg-blue-400/10 shrink-0">
+                <Check className="w-3.5 h-3.5 md:w-4 md:h-4 text-[#f59e0b]" />
               </div>
-              <span className="text-sm text-blue-100">Inspeções rápidas e padronizadas</span>
+              <span className="text-xs md:text-sm text-blue-100">Inspeções rápidas e padronizadas</span>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="w-8 h-8 rounded-full border border-blue-400/30 flex items-center justify-center bg-blue-400/10 shrink-0">
-                <FileText className="w-4 h-4 text-blue-300" />
+            <div className="flex items-center gap-3 md:gap-4">
+              <div className="w-7 h-7 md:w-8 md:h-8 rounded-full border border-blue-400/30 flex items-center justify-center bg-blue-400/10 shrink-0">
+                <FileText className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-300" />
               </div>
-              <span className="text-sm text-blue-100">Histórico e relatórios em tempo real</span>
+              <span className="text-xs md:text-sm text-blue-100">Histórico e relatórios em tempo real</span>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="w-8 h-8 rounded-full border border-blue-400/30 flex items-center justify-center bg-blue-400/10 shrink-0">
-                <Clock className="w-4 h-4 text-blue-300" />
+            <div className="flex items-center gap-3 md:gap-4">
+              <div className="w-7 h-7 md:w-8 md:h-8 rounded-full border border-blue-400/30 flex items-center justify-center bg-blue-400/10 shrink-0">
+                <Clock className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-300" />
               </div>
-              <span className="text-sm text-blue-100">Controle de frota por equipes</span>
+              <span className="text-xs md:text-sm text-blue-100">Controle de frota por equipes</span>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="w-8 h-8 rounded-full border border-blue-400/30 flex items-center justify-center bg-blue-400/10 shrink-0">
-                <Star className="w-4 h-4 text-blue-300" />
+            <div className="flex items-center gap-3 md:gap-4">
+              <div className="w-7 h-7 md:w-8 md:h-8 rounded-full border border-blue-400/30 flex items-center justify-center bg-blue-400/10 shrink-0">
+                <Star className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-300" />
               </div>
-              <span className="text-sm text-blue-100">Conformidade e auditoria digital</span>
+              <span className="text-xs md:text-sm text-blue-100">Conformidade e auditoria digital</span>
             </div>
           </div>
         </div>
 
         {/* Right Panel */}
-        <div className="w-full md:w-1/2 p-12 bg-[#2b6cb0] flex flex-col justify-center">
+        <div className="w-full md:w-1/2 p-8 md:p-12 bg-[#2b6cb0] flex flex-col justify-center">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="relative">
               <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-400" />

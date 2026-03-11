@@ -490,39 +490,43 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   />
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4 md:col-span-2 lg:col-span-3">
-                  <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100 space-y-4">
-                    <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Inicial/Recebimento</h3>
-                    <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:col-span-2 lg:col-span-3">
+                  <div className="p-3 md:p-4 bg-zinc-50 rounded-xl border border-zinc-100 space-y-4">
+                    <h3 className="text-xs md:text-sm font-bold text-zinc-400 uppercase tracking-widest text-center sm:text-left">Inicial/Recebimento</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-1 gap-3">
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold uppercase text-zinc-400">KM</label>
                         <input type="text" className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-sm" value={data.veiculo.kmEntrega} onChange={e => updateField('veiculo', 'kmEntrega', e.target.value)} />
                       </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold uppercase text-zinc-400">Data</label>
-                        <input type="date" className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-sm" value={data.veiculo.dataEntrega} onChange={e => updateField('veiculo', 'dataEntrega', e.target.value)} />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold uppercase text-zinc-400">Hora</label>
-                        <input type="time" className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-sm" value={data.veiculo.horaEntrega} onChange={e => updateField('veiculo', 'horaEntrega', e.target.value)} />
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase text-zinc-400">Data</label>
+                          <input type="date" className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-sm" value={data.veiculo.dataEntrega} onChange={e => updateField('veiculo', 'dataEntrega', e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase text-zinc-400">Hora</label>
+                          <input type="time" className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-sm" value={data.veiculo.horaEntrega} onChange={e => updateField('veiculo', 'horaEntrega', e.target.value)} />
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100 space-y-4">
-                    <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Final/Devolução</h3>
-                    <div className="space-y-3">
+                  <div className="p-3 md:p-4 bg-zinc-50 rounded-xl border border-zinc-100 space-y-4">
+                    <h3 className="text-xs md:text-sm font-bold text-zinc-400 uppercase tracking-widest text-center sm:text-left">Final/Devolução</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-1 gap-3">
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold uppercase text-zinc-400">KM</label>
                         <input type="text" className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-sm" value={data.veiculo.kmDevolucao} onChange={e => updateField('veiculo', 'kmDevolucao', e.target.value)} />
                       </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold uppercase text-zinc-400">Data</label>
-                        <input type="date" className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-sm" value={data.veiculo.dataDevolucao} onChange={e => updateField('veiculo', 'dataDevolucao', e.target.value)} />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold uppercase text-zinc-400">Hora</label>
-                        <input type="time" className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-sm" value={data.veiculo.horaDevolucao} onChange={e => updateField('veiculo', 'horaDevolucao', e.target.value)} />
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase text-zinc-400">Data</label>
+                          <input type="date" className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-sm" value={data.veiculo.dataDevolucao} onChange={e => updateField('veiculo', 'dataDevolucao', e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase text-zinc-400">Hora</label>
+                          <input type="time" className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-sm" value={data.veiculo.horaDevolucao} onChange={e => updateField('veiculo', 'horaDevolucao', e.target.value)} />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -767,15 +771,15 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                 </div>
                 <h2 className="text-xl font-semibold text-zinc-900">6. Nível de Combustível Inicial/Recebimento</h2>
               </div>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-2 md:gap-3">
                 {['Cheio', '3/4', '2/4', '1/4', 'Reserva'].map((level) => (
                   <button
                     key={level}
                     onClick={() => setData(prev => ({ ...prev, combustivelEntrega: level as any }))}
-                    className={`px-6 py-3 rounded-xl border transition-all text-sm font-medium ${
+                    className={`flex-1 min-w-[80px] px-4 md:px-6 py-2.5 md:py-3 rounded-xl border transition-all text-xs md:text-sm font-bold uppercase tracking-wider ${
                       data.combustivelEntrega === level 
-                      ? 'bg-[var(--color-brand-yellow)] text-zinc-900 border-[var(--color-brand-yellow)] shadow-md' 
-                      : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400'
+                      ? 'bg-zinc-900 text-white border-zinc-900 shadow-md' 
+                      : 'bg-white text-zinc-500 border-zinc-200 hover:border-zinc-400'
                     }`}
                   >
                     {level}
@@ -882,15 +886,15 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                 "Eu, <strong className="text-zinc-900 not-italic">{data.colaborador.nome || '____________________'}</strong>, declaro que recebi o veículo nas condições descritas neste checklist, comprometendo-me a utilizá-lo exclusivamente para fins autorizados, cumprir a legislação de trânsito vigente, zelar pela conservação do bem, comunicar imediatamente qualquer sinistro ou irregularidade e assumir responsabilidade por multas decorrentes de infrações cometidas durante o período de utilização por mim, conforme o termo de responsabilidade assinado com a empresa <strong className="text-zinc-900 not-italic">{data.empresa.razaoSocial || '____________________'}</strong>{data.empresa.cnpj ? <span className="not-italic font-medium text-zinc-900">, CNPJ: {data.empresa.cnpj}</span> : ''}."
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 pt-8">
                 <div className="space-y-4 flex flex-col items-center">
                   <SignaturePad 
                     initialSignature={data.assinaturaColaborador}
                     onSave={(sig) => updateField('assinaturaColaborador', '', sig)} 
                   />
                   <div className="h-px bg-zinc-300 w-full max-w-md mt-2"></div>
-                  <p className="text-center text-xs font-bold uppercase tracking-widest text-zinc-400">Assinatura do Colaborador</p>
-                  <p className="text-center text-sm text-zinc-900 font-medium">{data.colaborador.nome || 'Nome do Colaborador'}</p>
+                  <p className="text-center text-[10px] font-bold uppercase tracking-widest text-zinc-400">Assinatura do Colaborador</p>
+                  <p className="text-center text-sm text-zinc-900 font-bold uppercase">{data.colaborador.nome || 'NOME DO COLABORADOR'}</p>
                 </div>
                 <div className="space-y-4 flex flex-col items-center">
                   <SignaturePad 
@@ -898,8 +902,8 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                     onSave={(sig) => updateField('assinaturaResponsavel', '', sig)} 
                   />
                   <div className="h-px bg-zinc-300 w-full max-w-md mt-2"></div>
-                  <p className="text-center text-xs font-bold uppercase tracking-widest text-zinc-400">Assinatura do Responsável Empresa</p>
-                  <p className="text-center text-sm text-zinc-900 font-medium">{data.empresa.razaoSocial || 'Nome da Empresa'}</p>
+                  <p className="text-center text-[10px] font-bold uppercase tracking-widest text-zinc-400">Assinatura do Responsável Empresa</p>
+                  <p className="text-center text-sm text-zinc-900 font-bold uppercase">{data.empresa.razaoSocial || 'NOME DA EMPRESA'}</p>
                 </div>
               </div>
 
@@ -935,13 +939,13 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
 
   return (
     <>
-      <div className="pb-20 print:hidden">
-        <div className="mb-12">
+      <div className="pb-32 print:hidden">
+        <div className="mb-8 md:mb-12">
           <div className="flex items-center gap-2 text-zinc-400 text-[10px] font-bold uppercase tracking-widest mb-2">
             <span>PASSO {step} DE {totalSteps}</span>
             <div className="h-px flex-1 bg-zinc-200"></div>
           </div>
-          <h2 className="text-3xl font-bold text-zinc-900">
+          <h2 className="text-2xl md:text-3xl font-bold text-zinc-900">
             {step === 1 && "Identificação"}
             {step === 2 && "Dados do Veículo"}
             {step === 3 && "Condições de Entrega"}
@@ -949,6 +953,14 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
             {step === 5 && "Devolução"}
             {step === 6 && "Finalização"}
           </h2>
+          <div className="h-1.5 w-full bg-zinc-100 rounded-full mt-4 overflow-hidden">
+            <motion.div 
+              className="h-full bg-zinc-900"
+              initial={{ width: 0 }}
+              animate={{ width: `${(step / totalSteps) * 100}%` }}
+              transition={{ duration: 0.5, ease: "easeInOut" }}
+            />
+          </div>
         </div>
 
         <AnimatePresence mode="wait">
@@ -956,30 +968,48 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
         </AnimatePresence>
 
         {/* Navigation */}
-        <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-zinc-50 via-zinc-50 to-transparent pointer-events-none">
-          <div className="max-w-4xl mx-auto flex justify-between pointer-events-auto">
+        <div className="fixed bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-zinc-50 via-zinc-50 to-transparent pointer-events-none z-[90]">
+          <div className="max-w-4xl mx-auto flex items-center justify-between gap-4 pointer-events-auto">
             <button
               disabled={step === 1}
               onClick={() => setStep(s => s - 1)}
-              className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-semibold transition-all ${
+              className={`flex items-center justify-center gap-2 px-4 md:px-6 py-3 rounded-xl md:rounded-2xl font-bold transition-all uppercase tracking-widest text-[10px] md:text-xs ${
                 step === 1 
                 ? 'opacity-0 pointer-events-none' 
                 : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50 shadow-sm'
               }`}
             >
-              <ChevronLeft className="w-5 h-5" />
-              Anterior
+              <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
+              <span className="hidden sm:inline">Anterior</span>
             </button>
 
-            {step < totalSteps && (
-              <button
-                onClick={() => setStep(s => s + 1)}
-                className="flex items-center gap-2 px-8 py-3 bg-[#f5a623] text-zinc-900 rounded-xl font-bold hover:bg-[#d97706] transition-all shadow-[0_4px_0_rgb(180,110,10)] active:shadow-none active:translate-y-1"
+            <div className="flex items-center gap-2 md:gap-3">
+              <button 
+                onClick={handlePrint}
+                className="p-3 bg-white border border-zinc-200 text-zinc-600 rounded-xl font-bold hover:bg-zinc-50 transition-all shadow-sm"
+                title="Imprimir PDF"
               >
-                Próximo
-                <ChevronRight className="w-5 h-5" />
+                <Printer className="w-5 h-5" />
               </button>
-            )}
+              
+              {step < totalSteps ? (
+                <button
+                  onClick={() => setStep(s => s + 1)}
+                  className="flex items-center justify-center gap-2 px-8 md:px-10 py-3 bg-zinc-900 text-white rounded-xl font-bold hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-200 uppercase tracking-widest text-[10px] md:text-xs"
+                >
+                  Próximo
+                  <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
+                </button>
+              ) : (
+                <button
+                  onClick={handleSave}
+                  className="flex items-center justify-center gap-2 px-8 md:px-10 py-3 bg-zinc-900 text-white rounded-xl font-bold hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-200 uppercase tracking-widest text-[10px] md:text-xs"
+                >
+                  <Save className="w-4 h-4 md:w-5 md:h-5" />
+                  Finalizar
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

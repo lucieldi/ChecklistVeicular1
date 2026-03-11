@@ -192,15 +192,15 @@ export default function UserManagement() {
 
   return (
     <div className="space-y-8 pb-20">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-zinc-900">Gerenciar Usuários</h2>
+          <h2 className="text-2xl md:text-3xl font-bold text-zinc-900">Gerenciar Usuários</h2>
           <p className="text-zinc-500">Controle de papéis e acesso ao sistema</p>
         </div>
         {isAdmin && (
           <button 
             onClick={handleOpenAdd}
-            className="flex items-center gap-2 px-6 py-3 bg-[#b46e0a] text-white/90 rounded-xl font-bold hover:bg-[#965a08] transition-all shadow-lg shadow-zinc-200"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-[#b46e0a] text-white/90 rounded-xl font-bold hover:bg-[#965a08] transition-all shadow-lg shadow-zinc-200"
           >
             <UserPlus className="w-5 h-5" />
             Novo Usuário
@@ -216,64 +216,66 @@ export default function UserManagement() {
       )}
 
       <div className="bg-white rounded-3xl border border-blue-100 shadow-sm overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-blue-50/30 border-b border-blue-100">
-              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-blue-400">Usuário</th>
-              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-blue-400">Papel</th>
-              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-blue-400 text-right">Ações</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-blue-50">
-            {users.map((user) => (
-              <tr key={user.id} className="hover:bg-blue-50/20 transition-colors">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
-                      <UserIcon className="w-4 h-4 text-blue-400" />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-zinc-900">{user.fullName || 'Sem Nome'}</span>
-                      <span className="text-xs text-zinc-500">{user.username}</span>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                    user.role === 'admin' 
-                    ? 'bg-[#f59e0b] text-zinc-900' 
-                    : 'bg-blue-50 text-blue-600'
-                  }`}>
-                    {user.role === 'admin' && <Shield className="w-3 h-3" />}
-                    {user.role === 'admin' ? 'Administrador' : 'Comum'}
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    {(isAdmin || currentUser?.id === user.id) && (
-                      <button 
-                        onClick={() => handleOpenEdit(user)}
-                        className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                        title="Editar Usuário"
-                      >
-                        <Pencil className="w-5 h-5" />
-                      </button>
-                    )}
-                    {isAdmin && (
-                      <button 
-                        onClick={() => setUserToDelete(user)}
-                        className="p-2 text-blue-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                        title="Excluir Usuário"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    )}
-                  </div>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[600px]">
+            <thead>
+              <tr className="bg-blue-50/30 border-b border-blue-100">
+                <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-blue-400">Usuário</th>
+                <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-blue-400">Papel</th>
+                <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-blue-400 text-right">Ações</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-blue-50">
+              {users.map((user) => (
+                <tr key={user.id} className="hover:bg-blue-50/20 transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center shrink-0">
+                        <UserIcon className="w-4 h-4 text-blue-400" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-semibold text-zinc-900 truncate">{user.fullName || 'Sem Nome'}</span>
+                        <span className="text-xs text-zinc-500 truncate">{user.username}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                      user.role === 'admin' 
+                      ? 'bg-[#f59e0b] text-zinc-900' 
+                      : 'bg-blue-50 text-blue-600'
+                    }`}>
+                      {user.role === 'admin' && <Shield className="w-3 h-3" />}
+                      {user.role === 'admin' ? 'Administrador' : 'Comum'}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      {(isAdmin || currentUser?.id === user.id) && (
+                        <button 
+                          onClick={() => handleOpenEdit(user)}
+                          className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                          title="Editar Usuário"
+                        >
+                          <Pencil className="w-5 h-5" />
+                        </button>
+                      )}
+                      {isAdmin && (
+                        <button 
+                          onClick={() => setUserToDelete(user)}
+                          className="p-2 text-blue-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                          title="Excluir Usuário"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Delete Confirmation Modal */}
@@ -334,7 +336,7 @@ export default function UserManagement() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden"
+              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
             >
               <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
                 <h3 className="text-xl font-bold text-zinc-900">

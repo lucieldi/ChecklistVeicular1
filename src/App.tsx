@@ -15,8 +15,11 @@ import {
   FileText,
   Loader2,
   AlertCircle,
-  X
+  X,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { User, ChecklistData } from './types';
 import Login from './components/Login';
 import UserManagement from './components/UserManagement';
@@ -36,10 +39,12 @@ export default function App() {
   const [editingChecklistData, setEditingChecklistData] = useState<ChecklistData | null>(null);
   const [initializing, setInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isPermissionError, setIsPermissionError] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setIsPermissionError(false);
       if (firebaseUser) {
         try {
           // Sync with Firestore directly
@@ -150,24 +155,25 @@ export default function App() {
       )}
 
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-md border-b border-zinc-200 px-6 py-4">
+      <header className="bg-white/80 backdrop-blur-md border-b border-zinc-200 px-4 md:px-6 py-4 sticky top-0 z-[100]">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img 
               src="https://i.ibb.co/LzN2Yg1Z/logo.png" 
               alt="FleetCheck Logo" 
-              className="h-10 w-auto"
+              className="h-8 md:h-10 w-auto"
               referrerPolicy="no-referrer"
             />
-            <div>
+            <div className="hidden sm:block">
               <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
                 {user.role === 'admin' ? 'Painel Administrativo' : 'Acesso Colaborador'}
               </p>
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
-            <div className="flex bg-zinc-100 p-1 rounded-xl">
+          <div className="flex items-center gap-2 md:gap-4">
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex bg-zinc-100 p-1 rounded-xl">
               <button 
                 onClick={() => {
                   setEditingChecklistId(null);
@@ -223,19 +229,112 @@ export default function App() {
               )}
             </div>
             
-            <button 
-              onClick={handleLogout}
-              className="p-2.5 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all"
-              title="Sair"
-            >
-              <LogOut className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={handleLogout}
+                className="p-2.5 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all hidden md:block"
+                title="Sair"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+
+              {/* Mobile Menu Toggle */}
+              <button 
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="p-2.5 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all md:hidden"
+              >
+                {isMenuOpen ? <X className="w-6 h-6" /> : (
+                  <div className="space-y-1.5">
+                    <div className="w-6 h-0.5 bg-current"></div>
+                    <div className="w-6 h-0.5 bg-current"></div>
+                    <div className="w-6 h-0.5 bg-current"></div>
+                  </div>
+                )}
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Mobile Navigation Menu */}
+        <AnimatePresence>
+          {isMenuOpen && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="md:hidden mt-4 overflow-hidden"
+            >
+              <div className="flex flex-col gap-2 p-2 bg-zinc-50 rounded-2xl border border-zinc-200">
+                <button 
+                  onClick={() => {
+                    setEditingChecklistId(null);
+                    setEditingChecklistData(null);
+                    setView('checklist');
+                    setIsMenuOpen(false);
+                  }}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
+                    view === 'checklist' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-200'
+                  }`}
+                >
+                  <ClipboardList className="w-5 h-5" />
+                  Novo Checklist
+                </button>
+                <button 
+                  onClick={() => { setView('history'); setIsMenuOpen(false); }}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
+                    view === 'history' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-200'
+                  }`}
+                >
+                  <History className="w-5 h-5" />
+                  Histórico
+                </button>
+                <button 
+                  onClick={() => { setView('reports'); setIsMenuOpen(false); }}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
+                    view === 'reports' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-200'
+                  }`}
+                >
+                  <FileText className="w-5 h-5" />
+                  Relatórios
+                </button>
+                {user.role === 'admin' && (
+                  <>
+                    <button 
+                      onClick={() => { setView('registrations'); setIsMenuOpen(false); }}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
+                        view === 'registrations' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-200'
+                      }`}
+                    >
+                      <Database className="w-5 h-5" />
+                      Cadastros
+                    </button>
+                    <button 
+                      onClick={() => { setView('users'); setIsMenuOpen(false); }}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
+                        view === 'users' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-200'
+                      }`}
+                    >
+                      <Users className="w-5 h-5" />
+                      Usuários
+                    </button>
+                  </>
+                )}
+                <div className="h-px bg-zinc-200 my-1 mx-4"></div>
+                <button 
+                  onClick={handleLogout}
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 transition-all"
+                >
+                  <LogOut className="w-5 h-5" />
+                  Sair do Sistema
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-6 pt-12">
+      <main className="max-w-4xl mx-auto px-4 md:px-6 pt-8 md:pt-12">
         {isPermissionError && <FirebaseSetupGuide />}
         
         {!isPermissionError && view === 'checklist' && (
