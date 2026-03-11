@@ -10,31 +10,65 @@ import {
   User as UserIcon
 } from 'lucide-react';
 import { ChecklistData } from '../types';
+import { db_firebase } from '../lib/firebase';
+import { collection, getDocs, query, where, orderBy, deleteDoc, doc } from 'firebase/firestore';
 
 interface ChecklistRecord {
-  id: number;
+  id: string;
   created_at: string;
+  creator_name?: string;
   data: ChecklistData;
 }
 
 interface ChecklistHistoryProps {
-  onEdit: (id: number, data: ChecklistData) => void;
+  onEdit: (id: string, data: ChecklistData) => void;
 }
 
 export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
   const [checklists, setChecklists] = useState<ChecklistRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchChecklists = async () => {
     try {
-      const response = await fetch('/api/checklists');
-      const data = await response.json();
-      setChecklists(data);
-    } catch (err) {
-      console.error(err);
-      setError('Erro ao carregar histórico de checklists');
+      const userStr = localStorage.getItem('fleetcheck_user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      
+      let q;
+      if (user?.role === 'admin') {
+        q = query(collection(db_firebase, 'checklists'), orderBy('createdAt', 'desc'));
+      } else {
+        q = query(
+          collection(db_firebase, 'checklists'), 
+          where('userId', '==', user?.id)
+        );
+      }
+
+      const querySnapshot = await getDocs(q);
+      let records = querySnapshot.docs.map(doc => {
+        const data = doc.data() as any;
+        return {
+          id: doc.id,
+          created_at: data.createdAt || new Date().toISOString(),
+          creator_name: data.creator_name,
+          data: data as ChecklistData
+        };
+      });
+
+      // Sort in memory if not already sorted by Firestore (for non-admin users)
+      if (user?.role !== 'admin') {
+        records.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      }
+
+      setChecklists(records);
+    } catch (err: any) {
+      console.error('Error fetching checklists from Firebase:', err);
+      if (err.code === 'permission-denied') {
+        setError('Erro de Permissão: O banco de dados Firestore está bloqueado. Verifique as regras no console.');
+      } else {
+        setError('Erro ao carregar histórico do Firebase. Verifique as regras.');
+      }
     } finally {
       setLoading(false);
     }
@@ -44,22 +78,26 @@ export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
     fetchChecklists();
   }, []);
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     if (deletingId !== id) {
       setDeletingId(id);
       return;
     }
 
     try {
-      await fetch(`/api/checklists/${id}`, { method: 'DELETE' });
+      await deleteDoc(doc(db_firebase, 'checklists', id));
       setDeletingId(null);
       fetchChecklists();
     } catch (err) {
-      console.error(err);
-      setError('Erro ao excluir checklist');
+      console.error('Error deleting checklist from Firebase:', err);
+      setError('Erro ao excluir checklist do Firebase');
       setDeletingId(null);
     }
   };
+
+  const userStr = localStorage.getItem('fleetcheck_user');
+  const currentUser = userStr ? JSON.parse(userStr) : null;
+  const isAdmin = currentUser?.role === 'admin';
 
   if (loading) {
     return (
@@ -96,9 +134,16 @@ export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
           {checklists.map((record) => (
             <div key={record.id} className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="space-y-4 flex-1">
-                <div className="flex items-center gap-2 text-sm text-zinc-500 font-medium">
-                  <Calendar className="w-4 h-4" />
-                  {new Date(record.created_at).toLocaleString('pt-BR')}
+                <div className="flex items-center gap-4 text-sm text-zinc-500 font-medium">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    {new Date(record.created_at).toLocaleString('pt-BR')}
+                  </div>
+                  {record.creator_name && (
+                    <div className="flex items-center gap-2 px-2 py-0.5 bg-zinc-100 rounded-md text-zinc-600 text-[10px] font-bold uppercase tracking-wider">
+                      Criado por: {record.creator_name}
+                    </div>
+                  )}
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

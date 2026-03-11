@@ -22,10 +22,12 @@ import PrintView from './PrintView';
 import CameraCapture from './CameraCapture';
 import SignaturePad from './SignaturePad';
 import html2pdf from 'html2pdf.js';
+import { db_firebase } from '../lib/firebase';
+import { collection, addDoc, updateDoc, doc, getDocs, query } from 'firebase/firestore';
 
 const defaultInitialData: ChecklistData = {
   empresa: { razaoSocial: '', cnpj: '' },
-  colaborador: { nome: '', cpf: '', cargo: '', cnh: '', validadeCnh: '' },
+  colaborador: { id: undefined, nome: '', cpf: '', cargo: '', cnh: '', validadeCnh: '' },
   veiculo: {
     marcaModelo: '',
     placa: '',
@@ -67,7 +69,7 @@ const defaultInitialData: ChecklistData = {
 };
 
 interface ChecklistProps {
-  editingId?: number | null;
+  editingId?: string | null;
   initialData?: ChecklistData | null;
   onFinish?: () => void;
 }
@@ -93,9 +95,55 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
   }, [initialData]);
 
   useEffect(() => {
-    fetch('/api/empresas').then(res => res.json()).then(setEmpresas).catch(console.error);
-    fetch('/api/colaboradores').then(res => res.json()).then(setColaboradores).catch(console.error);
-    fetch('/api/veiculos').then(res => res.json()).then(setVeiculos).catch(console.error);
+    const fetchMasterData = async () => {
+      try {
+        const empresasSnap = await getDocs(collection(db_firebase, 'empresas'));
+        setEmpresas(empresasSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+        const colaboradoresSnap = await getDocs(collection(db_firebase, 'colaboradores'));
+        const colaboradoresList = colaboradoresSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setColaboradores(colaboradoresList);
+
+        const veiculosSnap = await getDocs(collection(db_firebase, 'veiculos'));
+        setVeiculos(veiculosSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+        // Auto-identify collaborator if not editing and user is common
+        if (!editingId && !initialData) {
+          const userStr = localStorage.getItem('fleetcheck_user');
+          const user = userStr ? JSON.parse(userStr) : null;
+          
+          if (user) {
+            const match = colaboradoresList.find((c: any) => 
+              (user.username && c.email?.toLowerCase() === user.username.toLowerCase()) ||
+              (user.fullName && c.nome?.toLowerCase() === user.fullName.toLowerCase())
+            ) as any;
+            
+            if (match) {
+              setData(prev => ({
+                ...prev,
+                colaborador: {
+                  id: match.id,
+                  nome: match.nome || '',
+                  cpf: match.cpf || '',
+                  cargo: match.cargo || '',
+                  cnh: match.cnh || '',
+                  validadeCnh: match.validadeCnh || ''
+                }
+              }));
+            }
+          }
+        }
+      } catch (err: any) {
+        console.error('Error fetching master data from Firebase:', err);
+        if (err.code === 'permission-denied') {
+          setSaveStatus({ 
+            type: 'error', 
+            message: 'Erro de Permissão: Verifique as regras do Firestore no console do Firebase.' 
+          });
+        }
+      }
+    };
+    fetchMasterData();
   }, []);
 
   const updateField = (section: keyof ChecklistData, field: string, value: any) => {
@@ -118,6 +166,40 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
         }
       }
     }));
+  };
+
+  const toggleAll = (section: 'condicoesEntrega' | 'acessorios', subSection?: 'externa' | 'interna' | 'mecanica', value?: boolean) => {
+    if (section === 'condicoesEntrega' && subSection !== undefined && value !== undefined) {
+      setData(prev => {
+        const currentSubSection = prev[section][subSection];
+        const newSubSection = { ...currentSubSection };
+        Object.keys(newSubSection).forEach(key => {
+          if (key !== 'obs') {
+            (newSubSection as any)[key] = value;
+          }
+        });
+        return {
+          ...prev,
+          [section]: {
+            ...prev[section],
+            [subSection]: newSubSection
+          }
+        };
+      });
+    } else if (section === 'acessorios' && value !== undefined) {
+      setData(prev => {
+        const newAcessorios = { ...prev.acessorios };
+        Object.keys(newAcessorios).forEach(key => {
+          if (key !== 'obs') {
+            (newAcessorios as any)[key] = value;
+          }
+        });
+        return {
+          ...prev,
+          acessorios: newAcessorios
+        };
+      });
+    }
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -177,30 +259,31 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
 
   const handleSave = async () => {
     try {
-      const url = editingId ? `/api/checklists/${editingId}` : '/api/checklists';
-      const method = editingId ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
+      const userStr = localStorage.getItem('fleetcheck_user');
+      const user = userStr ? JSON.parse(userStr) : null;
       
-      const result = await response.json();
-      if (result.success) {
-        setSaveStatus({ type: 'success', message: 'Checklist salvo com sucesso!' });
-        setTimeout(() => {
-          setSaveStatus(null);
-          setData(defaultInitialData);
-          setStep(1);
-          if (onFinish) onFinish();
-        }, 2000);
+      const checklistData = {
+        ...data,
+        userId: user?.id,
+        createdAt: new Date().toISOString()
+      };
+
+      if (editingId) {
+        await updateDoc(doc(db_firebase, 'checklists', String(editingId)), checklistData);
       } else {
-        setSaveStatus({ type: 'error', message: 'Erro ao salvar checklist: ' + result.message });
-        setTimeout(() => setSaveStatus(null), 3000);
+        await addDoc(collection(db_firebase, 'checklists'), checklistData);
       }
+      
+      setSaveStatus({ type: 'success', message: 'Checklist salvo no Firebase!' });
+      setTimeout(() => {
+        setSaveStatus(null);
+        setData(defaultInitialData);
+        setStep(1);
+        if (onFinish) onFinish();
+      }, 2000);
     } catch (error) {
-      setSaveStatus({ type: 'error', message: 'Erro ao conectar ao servidor para salvar o checklist.' });
+      console.error('Error saving checklist to Firebase:', error);
+      setSaveStatus({ type: 'error', message: 'Erro ao salvar no Firebase. Verifique as regras.' });
       setTimeout(() => setSaveStatus(null), 3000);
     }
   };
@@ -223,7 +306,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Razão Social</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">RAZÃO SOCIAL</label>
                   <select 
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
                     value={data.empresa.id || data.empresa.razaoSocial}
@@ -268,12 +351,13 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5 md:col-span-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Nome Completo</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">NOME COMPLETO</label>
                   <input 
-                    type="text" 
+                    type="text"
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
                     value={data.colaborador.nome}
                     onChange={e => updateField('colaborador', 'nome', e.target.value)}
+                    placeholder="Nome do colaborador"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -286,7 +370,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Cargo</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">CARGO</label>
                   <input 
                     type="text" 
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
@@ -295,7 +379,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">CNH nº</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">CNH Nº</label>
                   <input 
                     type="text" 
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
@@ -304,7 +388,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Validade</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">VALIDADE</label>
                   <input 
                     type="date" 
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
@@ -470,7 +554,18 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
               <div className="space-y-8">
                 {/* Parte Externa */}
                 <div>
-                  <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-4">Parte Externa</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Parte Externa</h3>
+                    <label className="flex items-center gap-2 text-xs font-medium text-zinc-500 cursor-pointer hover:text-zinc-900 transition-colors">
+                      <input 
+                        type="checkbox" 
+                        className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                        checked={Object.entries(data.condicoesEntrega.externa).filter(([k]) => k !== 'obs').every(([_, v]) => v === true)}
+                        onChange={e => toggleAll('condicoesEntrega', 'externa', e.target.checked)}
+                      />
+                      Marcar todos
+                    </label>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     {Object.entries(data.condicoesEntrega.externa).map(([key, value]) => {
                       if (key === 'obs') return null;
@@ -507,7 +602,18 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
 
                 {/* Parte Interna */}
                 <div>
-                  <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-4">Parte Interna</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Parte Interna</h3>
+                    <label className="flex items-center gap-2 text-xs font-medium text-zinc-500 cursor-pointer hover:text-zinc-900 transition-colors">
+                      <input 
+                        type="checkbox" 
+                        className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                        checked={Object.entries(data.condicoesEntrega.interna).filter(([k]) => k !== 'obs').every(([_, v]) => v === true)}
+                        onChange={e => toggleAll('condicoesEntrega', 'interna', e.target.checked)}
+                      />
+                      Marcar todos
+                    </label>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {Object.entries(data.condicoesEntrega.interna).map(([key, value]) => {
                       if (key === 'obs') return null;
@@ -542,7 +648,18 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
 
                 {/* Parte Mecânica */}
                 <div>
-                  <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-4">Parte Mecânica / Funcional</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Parte Mecânica / Funcional</h3>
+                    <label className="flex items-center gap-2 text-xs font-medium text-zinc-500 cursor-pointer hover:text-zinc-900 transition-colors">
+                      <input 
+                        type="checkbox" 
+                        className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                        checked={Object.entries(data.condicoesEntrega.mecanica).filter(([k]) => k !== 'obs').every(([_, v]) => v === true)}
+                        onChange={e => toggleAll('condicoesEntrega', 'mecanica', e.target.checked)}
+                      />
+                      Marcar todos
+                    </label>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {Object.entries(data.condicoesEntrega.mecanica).map(([key, value]) => {
                       if (key === 'obs') return null;
@@ -585,11 +702,22 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
             className="space-y-8"
           >
             <section className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-zinc-100 rounded-lg">
-                  <FileText className="w-5 h-5 text-zinc-600" />
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-zinc-100 rounded-lg">
+                    <FileText className="w-5 h-5 text-zinc-600" />
+                  </div>
+                  <h2 className="text-xl font-semibold text-zinc-900">5. Itens e Acessórios Entregues</h2>
                 </div>
-                <h2 className="text-xl font-semibold text-zinc-900">5. Itens e Acessórios Entregues</h2>
+                <label className="flex items-center gap-2 text-xs font-medium text-zinc-500 cursor-pointer hover:text-zinc-900 transition-colors">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                    checked={Object.entries(data.acessorios).filter(([k]) => k !== 'obs').every(([_, v]) => v === true)}
+                    onChange={e => toggleAll('acessorios', undefined, e.target.checked)}
+                  />
+                  Marcar todos
+                </label>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {Object.entries(data.acessorios).map(([key, value]) => {
@@ -804,8 +932,8 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
     <>
       <div className="pb-20 print:hidden">
         <div className="mb-12">
-          <div className="flex items-center gap-2 text-zinc-400 text-xs font-bold uppercase tracking-widest mb-2">
-            <span>Passo {step} de {totalSteps}</span>
+          <div className="flex items-center gap-2 text-zinc-400 text-[10px] font-bold uppercase tracking-widest mb-2">
+            <span>PASSO {step} DE {totalSteps}</span>
             <div className="h-px flex-1 bg-zinc-200"></div>
           </div>
           <h2 className="text-3xl font-bold text-zinc-900">
@@ -841,7 +969,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
             {step < totalSteps && (
               <button
                 onClick={() => setStep(s => s + 1)}
-                className="flex items-center gap-2 px-8 py-3 bg-[var(--color-brand-yellow)] text-zinc-900 rounded-2xl font-bold hover:bg-[var(--color-brand-yellow-hover)] transition-all shadow-lg shadow-zinc-200"
+                className="flex items-center gap-2 px-8 py-3 bg-[#f5a623] text-zinc-900 rounded-xl font-bold hover:bg-[#d97706] transition-all shadow-[0_4px_0_rgb(180,110,10)] active:shadow-none active:translate-y-1"
               >
                 Próximo
                 <ChevronRight className="w-5 h-5" />

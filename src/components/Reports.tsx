@@ -8,10 +8,13 @@ import {
   Filter
 } from 'lucide-react';
 import { ChecklistData } from '../types';
+import { db_firebase } from '../lib/firebase';
+import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 
 interface ChecklistRecord {
-  id: number;
+  id: string;
   created_at: string;
+  creator_name?: string;
   data: ChecklistData;
 }
 
@@ -23,12 +26,43 @@ export default function Reports() {
 
   const fetchChecklists = async () => {
     try {
-      const response = await fetch('/api/checklists');
-      const data = await response.json();
-      setChecklists(data);
-    } catch (err) {
-      console.error(err);
-      setError('Erro ao carregar relatórios');
+      const userStr = localStorage.getItem('fleetcheck_user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      
+      let q;
+      if (user?.role === 'admin') {
+        q = query(collection(db_firebase, 'checklists'), orderBy('createdAt', 'desc'));
+      } else {
+        q = query(
+          collection(db_firebase, 'checklists'), 
+          where('userId', '==', user?.id)
+        );
+      }
+
+      const querySnapshot = await getDocs(q);
+      let records = querySnapshot.docs.map(doc => {
+        const data = doc.data() as any;
+        return {
+          id: doc.id,
+          created_at: data.createdAt || new Date().toISOString(),
+          creator_name: data.creator_name,
+          data: data as ChecklistData
+        };
+      });
+
+      // Sort in memory if not already sorted by Firestore (for non-admin users)
+      if (user?.role !== 'admin') {
+        records.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      }
+
+      setChecklists(records);
+    } catch (err: any) {
+      console.error('Error fetching reports from Firebase:', err);
+      if (err.code === 'permission-denied') {
+        setError('Erro de Permissão: O banco de dados Firestore está bloqueado. Verifique as regras no console.');
+      } else {
+        setError('Erro ao carregar relatórios do Firebase');
+      }
     } finally {
       setLoading(false);
     }
@@ -38,13 +72,18 @@ export default function Reports() {
     fetchChecklists();
   }, []);
 
+  const userStr = localStorage.getItem('fleetcheck_user');
+  const currentUser = userStr ? JSON.parse(userStr) : null;
+  const isAdmin = currentUser?.role === 'admin';
+
   const filteredChecklists = checklists.filter(record => {
     const searchLower = searchTerm.toLowerCase();
     return (
       record.data.colaborador.nome.toLowerCase().includes(searchLower) ||
       record.data.empresa.razaoSocial.toLowerCase().includes(searchLower) ||
       record.data.veiculo.placa.toLowerCase().includes(searchLower) ||
-      record.data.veiculo.marcaModelo.toLowerCase().includes(searchLower)
+      record.data.veiculo.marcaModelo.toLowerCase().includes(searchLower) ||
+      (record.creator_name && record.creator_name.toLowerCase().includes(searchLower))
     );
   });
 
@@ -52,6 +91,7 @@ export default function Reports() {
     const headers = [
       'ID',
       'Data',
+      'Criado por',
       'Empresa',
       'CNPJ',
       'Colaborador',
@@ -69,6 +109,7 @@ export default function Reports() {
         return [
           record.id,
           `"${date}"`,
+          `"${record.creator_name || 'N/A'}"`,
           `"${record.data.empresa.razaoSocial}"`,
           `"${record.data.empresa.cnpj}"`,
           `"${record.data.colaborador.nome}"`,
@@ -149,6 +190,7 @@ export default function Reports() {
               <tr className="bg-zinc-50 border-b border-zinc-200 text-zinc-500">
                 <th className="px-6 py-4 font-bold uppercase tracking-wider text-xs">ID</th>
                 <th className="px-6 py-4 font-bold uppercase tracking-wider text-xs">Data</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider text-xs">Criado por</th>
                 <th className="px-6 py-4 font-bold uppercase tracking-wider text-xs">Empresa</th>
                 <th className="px-6 py-4 font-bold uppercase tracking-wider text-xs">Colaborador</th>
                 <th className="px-6 py-4 font-bold uppercase tracking-wider text-xs">Veículo</th>
@@ -158,7 +200,7 @@ export default function Reports() {
             <tbody className="divide-y divide-zinc-100">
               {filteredChecklists.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-zinc-500">
+                  <td colSpan={isAdmin ? 7 : 6} className="px-6 py-12 text-center text-zinc-500">
                     Nenhum registro encontrado.
                   </td>
                 </tr>
@@ -168,6 +210,9 @@ export default function Reports() {
                     <td className="px-6 py-4 font-medium text-zinc-900">#{record.id}</td>
                     <td className="px-6 py-4 text-zinc-600">
                       {new Date(record.created_at).toLocaleString('pt-BR')}
+                    </td>
+                    <td className="px-6 py-4 text-zinc-600">
+                      {record.creator_name || 'N/A'}
                     </td>
                     <td className="px-6 py-4 text-zinc-600">
                       {record.data.empresa.razaoSocial || '-'}

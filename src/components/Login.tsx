@@ -1,16 +1,21 @@
 import React, { useState } from 'react';
-import { LogIn, Shield, User as UserIcon, AlertCircle, Mail, Truck, Check, FileText, Clock, Star, Lock, ArrowRight, CreditCard } from 'lucide-react';
+import { User as UserIcon, AlertCircle, Truck, Check, FileText, Clock, Star, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'motion/react';
 import { User } from '../types';
+import { auth } from '../lib/firebase';
+import { 
+  signInWithEmailAndPassword, 
+  onAuthStateChanged
+} from 'firebase/auth';
 
 interface LoginProps {
   onLogin: (user: User) => void;
 }
 
 export default function Login({ onLogin }: LoginProps) {
-  const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -20,22 +25,30 @@ export default function Login({ onLogin }: LoginProps) {
     setError('');
 
     try {
-      const endpoint = isRegistering ? '/api/register' : '/api/login';
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: email, password })
-      });
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      // The user sync is now handled by the onAuthStateChanged listener in App.tsx
+    } catch (err: any) {
+      console.error('Auth error:', err);
+      const errorCode = err.code;
+      const errorMessage = err.message;
 
-      const result = await response.json();
-
-      if (result.success) {
-        onLogin(result.user);
+      if (errorMessage === 'Failed to fetch') {
+        setError('Erro de conexão com o Firebase. Verifique sua internet ou se o serviço está bloqueado.');
+      } else if (errorCode === 'auth/user-not-found' || errorCode === 'auth/wrong-password' || errorCode === 'auth/invalid-credential') {
+        setError('E-mail ou senha incorretos. Verifique suas credenciais.');
+      } else if (errorCode === 'auth/user-disabled') {
+        setError('Esta conta foi desativada. Entre em contato com o administrador.');
+      } else if (errorCode === 'auth/too-many-requests') {
+        setError('Muitas tentativas malsucedidas. Tente novamente mais tarde ou redefina sua senha.');
+      } else if (errorCode === 'auth/email-already-in-use') {
+        setError('Este e-mail já está em uso.');
+      } else if (errorCode === 'auth/weak-password') {
+        setError('A senha deve ter pelo menos 6 caracteres.');
+      } else if (errorCode === 'auth/invalid-email') {
+        setError('E-mail inválido.');
       } else {
-        setError(result.message || 'Erro ao autenticar');
+        setError(`Erro ao autenticar: ${errorMessage || 'Tente novamente.'}`);
       }
-    } catch (err) {
-      setError('Erro ao conectar ao servidor. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -115,13 +128,20 @@ export default function Login({ onLogin }: LoginProps) {
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-400" />
               <input 
-                type="password" 
+                type={showPassword ? "text" : "password"} 
                 required
-                className="w-full pl-12 pr-4 py-3.5 bg-white border-none rounded-xl text-zinc-900 placeholder-zinc-400 focus:ring-2 focus:ring-[#f59e0b] outline-none transition-all font-medium"
+                className="w-full pl-12 pr-12 py-3.5 bg-white border-none rounded-xl text-zinc-900 placeholder-zinc-400 focus:ring-2 focus:ring-[#f59e0b] outline-none transition-all font-medium"
                 placeholder="Senha"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-600 transition-colors"
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
             </div>
 
             <div className="flex items-center justify-between text-sm text-white">
@@ -129,7 +149,6 @@ export default function Login({ onLogin }: LoginProps) {
                 <input type="checkbox" className="rounded border-white/20 bg-white/10 text-[#f59e0b] focus:ring-[#f59e0b]" />
                 Lembrar-me
               </label>
-              <a href="#" className="hover:text-blue-200 transition-colors italic">Esqueci a senha</a>
             </div>
 
             {error && (
@@ -148,7 +167,7 @@ export default function Login({ onLogin }: LoginProps) {
               disabled={loading}
               className="w-full py-3.5 bg-[#f59e0b] text-[#1a3b5c] rounded-xl font-bold hover:bg-[#d97706] transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-wide"
             >
-              {loading ? 'Aguarde...' : (isRegistering ? 'CRIAR CONTA' : 'ENTRAR')}
+              {loading ? 'Aguarde...' : 'ENTRAR'}
               {!loading && <ArrowRight className="w-5 h-5" />}
             </button>
           </form>

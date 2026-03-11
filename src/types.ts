@@ -1,6 +1,7 @@
 export interface User {
   id: string;
   username: string;
+  fullName?: string;
   role: 'admin' | 'common';
 }
 
@@ -11,6 +12,7 @@ export interface ChecklistData {
     cnpj: string;
   };
   colaborador: {
+    id?: string | number;
     nome: string;
     cpf: string;
     cargo: string;

@@ -10,32 +10,62 @@ import {
   AlertCircle,
   Loader2,
   Pencil,
-  Save
+  Save,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from '../types';
+import { db_firebase } from '../lib/firebase';
+import { collection, getDocs, updateDoc, deleteDoc, doc, query, setDoc } from 'firebase/firestore';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
+
+// Secondary Firebase app to create users without signing out the admin
+const firebaseConfig = {
+  apiKey: "AIzaSyD26v9EVZljibvV2vqlWizqVuChKRumyys",
+  authDomain: "checklistauto-558e2.firebaseapp.com",
+  projectId: "checklistauto-558e2",
+  storageBucket: "checklistauto-558e2.firebasestorage.app",
+  messagingSenderId: "318214932522",
+  appId: "1:318214932522:web:651c4f1d868c45f5ef1b53",
+};
+
+const secondaryApp = getApps().find(app => app.name === 'Secondary') 
+  || initializeApp(firebaseConfig, 'Secondary');
+const secondaryAuth = getAuth(secondaryApp);
 
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [error, setError] = useState('');
   
   // Form state
   const [username, setUsername] = useState('');
+  const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState<'admin' | 'common'>('common');
   const [submitting, setSubmitting] = useState(false);
 
+  const userStr = localStorage.getItem('fleetcheck_user');
+  const currentUser = userStr ? JSON.parse(userStr) : null;
+  const isAdmin = currentUser?.role === 'admin';
+
   const fetchUsers = async () => {
     try {
-      const response = await fetch('/api/users');
-      const data = await response.json();
-      setUsers(data);
+      const querySnapshot = await getDocs(collection(db_firebase, 'users'));
+      const usersList = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as User[];
+      setUsers(usersList);
     } catch (err) {
-      console.error(err);
-      setError('Erro ao carregar usuários');
+      console.error('Error fetching users from Firebase:', err);
+      setError('Erro ao carregar usuários do Firebase');
     } finally {
       setLoading(false);
     }
@@ -47,7 +77,9 @@ export default function UserManagement() {
 
   const resetForm = () => {
     setUsername('');
+    setFullName('');
     setPassword('');
+    setShowPassword(false);
     setRole('common');
     setError('');
   };
@@ -61,6 +93,7 @@ export default function UserManagement() {
     resetForm();
     setEditingUser(user);
     setUsername(user.username);
+    setFullName(user.fullName || '');
     setRole(user.role);
   };
 
@@ -69,49 +102,84 @@ export default function UserManagement() {
     setSubmitting(true);
     setError('');
 
-    const url = editingUser ? `/api/users/${editingUser.id}` : '/api/users';
-    const method = editingUser ? 'PUT' : 'POST';
-
     try {
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          username, 
-          password: password || undefined, 
-          role 
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
+      if (editingUser) {
+        const userRef = doc(db_firebase, 'users', editingUser.id);
+        await updateDoc(userRef, { role, fullName });
+        
         setShowAddModal(false);
         setEditingUser(null);
         resetForm();
         fetchUsers();
       } else {
-        setError(result.message || 'Erro ao processar solicitação');
+        // Create new user in Auth
+        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, username, password);
+        const newUser = userCredential.user;
+
+        // Save user info in Firestore
+        await setDoc(doc(db_firebase, 'users', newUser.uid), {
+          username: username,
+          fullName: fullName,
+          role: role
+        });
+
+        // Sign out from secondary auth to be clean
+        await secondaryAuth.signOut();
+
+        setShowAddModal(false);
+        resetForm();
+        fetchUsers();
       }
-    } catch (err) {
-      console.error(err);
-      setError('Erro ao salvar usuário');
+    } catch (err: any) {
+      console.error('Error saving user in Firebase:', err);
+      if (err.code === 'auth/email-already-in-use') {
+        setError('Este e-mail já está em uso');
+      } else if (err.code === 'auth/weak-password') {
+        setError('A senha deve ter pelo menos 6 caracteres');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('E-mail inválido');
+      } else {
+        setError('Erro ao salvar usuário no Firebase');
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDeleteUser = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este usuário?')) return;
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
 
     try {
-      await fetch(`/api/users/${id}`, { method: 'DELETE' });
+      // Delete from Firestore
+      await deleteDoc(doc(db_firebase, 'users', userToDelete.id));
+      
+      // Delete from local SQLite database via server API
+      await fetch(`/api/users/${userToDelete.id}`, { method: 'DELETE' });
+
+      // If deleting current user, also delete from Firebase Auth
+      const auth = getAuth();
+      if (userToDelete.id === auth.currentUser?.uid) {
+        await deleteUser(auth.currentUser);
+        window.location.reload(); // Force logout/refresh
+      }
+
+      setUserToDelete(null);
       fetchUsers();
     } catch (err) {
-      console.error(err);
+      console.error('Error deleting user:', err);
       setError('Erro ao excluir usuário');
     }
   };
+
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <AlertCircle className="w-12 h-12 text-red-500" />
+        <h2 className="text-xl font-bold text-zinc-900">Acesso Negado</h2>
+        <p className="text-zinc-500">Você não tem permissão para acessar esta área.</p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -127,49 +195,54 @@ export default function UserManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold text-zinc-900">Gerenciar Usuários</h2>
-          <p className="text-zinc-500">Controle de acesso ao sistema</p>
+          <p className="text-zinc-500">Controle de papéis e acesso ao sistema</p>
         </div>
-        <button 
-          onClick={handleOpenAdd}
-          className="flex items-center gap-2 px-6 py-3 bg-[var(--color-brand-yellow)] text-zinc-900 rounded-2xl font-bold hover:bg-[var(--color-brand-yellow-hover)] transition-all shadow-lg shadow-zinc-200"
-        >
-          <UserPlus className="w-5 h-5" />
-          Novo Usuário
-        </button>
+        {isAdmin && (
+          <button 
+            onClick={handleOpenAdd}
+            className="flex items-center gap-2 px-6 py-3 bg-[#b46e0a] text-white/90 rounded-xl font-bold hover:bg-[#965a08] transition-all shadow-lg shadow-zinc-200"
+          >
+            <UserPlus className="w-5 h-5" />
+            Novo Usuário
+          </button>
+        )}
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 p-4 bg-red-50 text-red-600 rounded-2xl text-sm border border-red-100">
+        <div className="flex items-center gap-2 p-4 bg-red-50 text-red-600 rounded-xl text-sm border border-red-100">
           <AlertCircle className="w-5 h-5" />
           {error}
         </div>
       )}
 
-      <div className="bg-white rounded-3xl border border-zinc-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-3xl border border-blue-100 shadow-sm overflow-hidden">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-zinc-50 border-b border-zinc-200">
-              <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-zinc-400">Usuário</th>
-              <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-zinc-400">Papel</th>
-              <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-zinc-400 text-right">Ações</th>
+            <tr className="bg-blue-50/30 border-b border-blue-100">
+              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-blue-400">Usuário</th>
+              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-blue-400">Papel</th>
+              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-blue-400 text-right">Ações</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-100">
+          <tbody className="divide-y divide-blue-50">
             {users.map((user) => (
-              <tr key={user.id} className="hover:bg-zinc-50 transition-colors">
+              <tr key={user.id} className="hover:bg-blue-50/20 transition-colors">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-zinc-100 rounded-lg flex items-center justify-center">
-                      <UserIcon className="w-4 h-4 text-zinc-500" />
+                    <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+                      <UserIcon className="w-4 h-4 text-blue-400" />
                     </div>
-                    <span className="font-semibold text-zinc-900">{user.username}</span>
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-zinc-900">{user.fullName || 'Sem Nome'}</span>
+                      <span className="text-xs text-zinc-500">{user.username}</span>
+                    </div>
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                  <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                     user.role === 'admin' 
-                    ? 'bg-[var(--color-brand-yellow)] text-zinc-900' 
-                    : 'bg-zinc-100 text-zinc-600'
+                    ? 'bg-[#f59e0b] text-zinc-900' 
+                    : 'bg-blue-50 text-blue-600'
                   }`}>
                     {user.role === 'admin' && <Shield className="w-3 h-3" />}
                     {user.role === 'admin' ? 'Administrador' : 'Comum'}
@@ -177,20 +250,24 @@ export default function UserManagement() {
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end gap-2">
-                    <button 
-                      onClick={() => handleOpenEdit(user)}
-                      className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all"
-                      title="Editar Usuário"
-                    >
-                      <Pencil className="w-5 h-5" />
-                    </button>
-                    <button 
-                      onClick={() => handleDeleteUser(user.id)}
-                      className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                      title="Excluir Usuário"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
+                    {(isAdmin || currentUser?.id === user.id) && (
+                      <button 
+                        onClick={() => handleOpenEdit(user)}
+                        className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                        title="Editar Usuário"
+                      >
+                        <Pencil className="w-5 h-5" />
+                      </button>
+                    )}
+                    {isAdmin && (
+                      <button 
+                        onClick={() => setUserToDelete(user)}
+                        className="p-2 text-blue-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                        title="Excluir Usuário"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -198,6 +275,49 @@ export default function UserManagement() {
           </tbody>
         </table>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {userToDelete && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setUserToDelete(null)}
+              className="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl p-8 text-center"
+            >
+              <div className="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <Trash2 className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-zinc-900 mb-2">Excluir Usuário?</h3>
+              <p className="text-zinc-500 mb-8">
+                Tem certeza que deseja excluir <strong>{userToDelete.username}</strong>? Esta ação não pode ser desfeita.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setUserToDelete(null)}
+                  className="px-4 py-3 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleDeleteUser}
+                  className="px-4 py-3 bg-red-600 text-white rounded-2xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-200"
+                >
+                  Excluir
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Add/Edit User Modal */}
       <AnimatePresence>
@@ -230,50 +350,78 @@ export default function UserManagement() {
 
               <form onSubmit={handleSubmit} className="p-6 space-y-6">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Nome de Usuário</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-blue-500">Nome Completo</label>
                   <input 
                     type="text" 
                     required
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
+                    className="w-full px-4 py-3 bg-white border border-blue-100 rounded-xl outline-none focus:ring-2 focus:ring-[#f59e0b] transition-all"
+                    value={fullName}
+                    onChange={e => setFullName(e.target.value)}
+                    placeholder="Nome Completo do Usuário"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-blue-500">Nome de Usuário (E-mail)</label>
+                  <input 
+                    type="email" 
+                    required
+                    disabled={!!editingUser}
+                    className={`w-full px-4 py-3 border border-blue-100 rounded-xl outline-none transition-all ${
+                      editingUser ? 'bg-zinc-100 cursor-not-allowed' : 'bg-white focus:ring-2 focus:ring-[#f59e0b]'
+                    }`}
                     value={username}
                     onChange={e => setUsername(e.target.value)}
+                    placeholder="exemplo@email.com"
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-                    {editingUser ? 'Nova Senha (deixe em branco para manter)' : 'Senha Inicial'}
-                  </label>
-                  <input 
-                    type="password" 
-                    required={!editingUser}
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                  />
-                </div>
+                {!editingUser && (
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-blue-500">Senha</label>
+                    <div className="relative">
+                      <input 
+                        type={showPassword ? "text" : "password"} 
+                        required
+                        className="w-full px-4 py-3 bg-white border border-blue-100 rounded-xl outline-none focus:ring-2 focus:ring-[#f59e0b] transition-all"
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        placeholder="Mínimo 6 caracteres"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-600 transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Papel do Usuário</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-blue-500">Papel do Usuário</label>
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
+                      disabled={!isAdmin}
                       onClick={() => setRole('common')}
-                      className={`px-4 py-3 rounded-2xl border font-bold text-sm transition-all ${
+                      className={`px-4 py-3 rounded-xl border font-bold text-sm transition-all disabled:opacity-50 ${
                         role === 'common' 
-                        ? 'bg-[var(--color-brand-yellow)] text-zinc-900 border-[var(--color-brand-yellow)]' 
-                        : 'bg-white text-zinc-500 border-zinc-200 hover:border-zinc-400'
+                        ? 'bg-[#f59e0b] text-zinc-900 border-[#f59e0b]' 
+                        : 'bg-white text-blue-500 border-blue-200 hover:border-blue-400'
                       }`}
                     >
                       Comum
                     </button>
                     <button
                       type="button"
+                      disabled={!isAdmin}
                       onClick={() => setRole('admin')}
-                      className={`px-4 py-3 rounded-2xl border font-bold text-sm transition-all ${
+                      className={`px-4 py-3 rounded-xl border font-bold text-sm transition-all disabled:opacity-50 ${
                         role === 'admin' 
-                        ? 'bg-[var(--color-brand-yellow)] text-zinc-900 border-[var(--color-brand-yellow)]' 
-                        : 'bg-white text-zinc-500 border-zinc-200 hover:border-zinc-400'
+                        ? 'bg-[#f59e0b] text-zinc-900 border-[#f59e0b]' 
+                        : 'bg-white text-blue-500 border-blue-200 hover:border-blue-400'
                       }`}
                     >
                       Administrador
@@ -284,7 +432,7 @@ export default function UserManagement() {
                 <button 
                   type="submit"
                   disabled={submitting}
-                  className="w-full py-4 bg-[var(--color-brand-yellow)] text-zinc-900 rounded-2xl font-bold hover:bg-[var(--color-brand-yellow-hover)] transition-all shadow-lg shadow-zinc-200 flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-[#f59e0b] text-zinc-900 rounded-xl font-bold hover:bg-[#d97706] transition-all shadow-[0_4px_0_rgb(180,110,10)] active:shadow-none active:translate-y-1 flex items-center justify-center gap-2"
                 >
                   {submitting ? (
                     <Loader2 className="w-5 h-5 animate-spin" />

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Car, 
   Truck,
@@ -12,7 +12,10 @@ import {
   ClipboardList,
   History,
   Database,
-  FileText
+  FileText,
+  Loader2,
+  AlertCircle,
+  X
 } from 'lucide-react';
 import { User, ChecklistData } from './types';
 import Login from './components/Login';
@@ -21,18 +24,102 @@ import Checklist from './components/Checklist';
 import ChecklistHistory from './components/ChecklistHistory';
 import Registrations from './components/Registrations';
 import Reports from './components/Reports';
+import FirebaseSetupGuide from './components/FirebaseSetupGuide';
+import { auth, db_firebase } from './lib/firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [view, setView] = useState<'checklist' | 'history' | 'users' | 'registrations' | 'reports'>('checklist');
-  const [editingChecklistId, setEditingChecklistId] = useState<number | null>(null);
+  const [editingChecklistId, setEditingChecklistId] = useState<string | null>(null);
   const [editingChecklistData, setEditingChecklistData] = useState<ChecklistData | null>(null);
+  const [initializing, setInitializing] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isPermissionError, setIsPermissionError] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          // Sync with Firestore directly
+          const userRef = doc(db_firebase, 'users', firebaseUser.uid);
+          const userSnap = await getDoc(userRef);
+          
+          const adminEmails = ['ti@uniqservice.com.br'];
+          const shouldBeAdmin = adminEmails.includes(firebaseUser.email || '') || firebaseUser.email?.includes('admin');
+          
+          let userData: User;
+
+          if (userSnap.exists()) {
+            const existingData = userSnap.data() as User;
+            if (shouldBeAdmin && existingData.role !== 'admin') {
+              // Forced upgrade to admin
+              await setDoc(userRef, { role: 'admin' }, { merge: true });
+              userData = { ...existingData, id: userSnap.id, role: 'admin' };
+            } else {
+              userData = { ...existingData, id: userSnap.id };
+            }
+          } else {
+            // New user
+            userData = {
+              id: firebaseUser.uid,
+              username: firebaseUser.email || '',
+              role: shouldBeAdmin ? 'admin' : 'common'
+            };
+            await setDoc(userRef, userData);
+          }
+
+          setUser(userData);
+          localStorage.setItem('fleetcheck_user', JSON.stringify(userData));
+        } catch (error: any) {
+          console.error('Error syncing user with Firestore:', error);
+          
+          if (error.code === 'permission-denied') {
+            setIsPermissionError(true);
+            setError('Erro de Permissão no Firebase: O banco de dados está bloqueado.');
+          } else {
+            setError('Erro ao sincronizar perfil: ' + (error.message || 'Erro desconhecido'));
+          }
+
+          const localUser = localStorage.getItem('fleetcheck_user');
+          if (localUser) {
+            setUser(JSON.parse(localUser));
+          }
+        }
+      } else {
+        setUser(null);
+        localStorage.removeItem('fleetcheck_user');
+      }
+      setInitializing(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  if (initializing) {
+    return (
+      <div className="min-h-screen bg-[#154b85] flex flex-col items-center justify-center gap-4">
+        <Loader2 className="w-12 h-12 text-white animate-spin" />
+        <p className="text-blue-100 font-medium animate-pulse">Iniciando FleetCheck...</p>
+      </div>
+    );
+  }
 
   if (!user) {
     return <Login onLogin={setUser} />;
   }
 
-  const handleEditChecklist = (id: number, data: ChecklistData) => {
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
+  const handleEditChecklist = (id: string, data: ChecklistData) => {
     setEditingChecklistId(id);
     setEditingChecklistData(data);
     setView('checklist');
@@ -46,6 +133,22 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900 font-sans selection:bg-zinc-900 selection:text-white">
+      {/* Error Banner */}
+      {error && (
+        <div className="bg-red-600 text-white px-6 py-3 flex items-center justify-between gap-4 sticky top-0 z-[110] shadow-lg">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <p className="text-sm font-medium">{error}</p>
+          </div>
+          <button 
+            onClick={() => setError(null)}
+            className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-md border-b border-zinc-200 px-6 py-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
@@ -87,17 +190,17 @@ export default function App() {
                 <History className="w-4 h-4" />
                 Histórico
               </button>
+              <button 
+                onClick={() => setView('reports')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                  view === 'reports' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                Relatórios
+              </button>
               {user.role === 'admin' && (
                 <>
-                  <button 
-                    onClick={() => setView('reports')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                      view === 'reports' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'
-                    }`}
-                  >
-                    <FileText className="w-4 h-4" />
-                    Relatórios
-                  </button>
                   <button 
                     onClick={() => setView('registrations')}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
@@ -121,7 +224,7 @@ export default function App() {
             </div>
             
             <button 
-              onClick={() => setUser(null)}
+              onClick={handleLogout}
               className="p-2.5 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all"
               title="Sair"
             >
@@ -133,7 +236,9 @@ export default function App() {
 
       {/* Main Content */}
       <main className="max-w-4xl mx-auto px-6 pt-12">
-        {view === 'checklist' && (
+        {isPermissionError && <FirebaseSetupGuide />}
+        
+        {!isPermissionError && view === 'checklist' && (
           <Checklist 
             editingId={editingChecklistId} 
             initialData={editingChecklistData} 
@@ -142,8 +247,8 @@ export default function App() {
         )}
         {view === 'history' && <ChecklistHistory onEdit={handleEditChecklist} />}
         {view === 'reports' && <Reports />}
-        {view === 'registrations' && <Registrations />}
-        {view === 'users' && <UserManagement />}
+        {user.role === 'admin' && view === 'registrations' && <Registrations />}
+        {user.role === 'admin' && view === 'users' && <UserManagement />}
       </main>
     </div>
   );

@@ -5,58 +5,64 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const dbPath = 'database.db';
-const db = new Database(dbPath);
+const dbPath = path.join(__dirname, 'database.db');
+console.log(`Using database at: ${dbPath}`);
 
-// Initialize database
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE,
-    password TEXT,
-    role TEXT CHECK(role IN ('admin', 'common'))
-  );
-
-  CREATE TABLE IF NOT EXISTS checklists (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    data TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS empresas (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    razaoSocial TEXT NOT NULL,
-    cnpj TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS colaboradores (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nome TEXT NOT NULL,
-    cpf TEXT,
-    cargo TEXT,
-    cnh TEXT,
-    validadeCnh TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS veiculos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    marcaModelo TEXT NOT NULL,
-    placa TEXT NOT NULL,
-    renavam TEXT,
-    cor TEXT,
-    anoModelo TEXT
-  );
-`);
-
-// Create default admin if not exists
-const adminExists = db.prepare('SELECT * FROM users WHERE username = ?').get('admin@exemplo.com');
-if (!adminExists) {
-  db.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)').run('admin@exemplo.com', 'admin123', 'admin');
-  db.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)').run('user@exemplo.com', 'user123', 'common');
+let db: any;
+try {
+  db = new Database(dbPath);
+  console.log('Database connected successfully');
+} catch (err) {
+  console.error('Failed to connect to database:', err);
+  process.exit(1);
 }
 
-// Remove old 'admin' and 'user' accounts if they exist
-db.prepare("DELETE FROM users WHERE username IN ('admin', 'user')").run();
+// Initialize SQLite database
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      username TEXT UNIQUE,
+      role TEXT CHECK(role IN ('admin', 'common'))
+    );
+
+    CREATE TABLE IF NOT EXISTS checklists (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT,
+      data TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS empresas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      razaoSocial TEXT NOT NULL,
+      cnpj TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS colaboradores (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome TEXT NOT NULL,
+      cpf TEXT,
+      cargo TEXT,
+      cnh TEXT,
+      validadeCnh TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS veiculos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      marcaModelo TEXT NOT NULL,
+      placa TEXT NOT NULL,
+      renavam TEXT,
+      cor TEXT,
+      anoModelo TEXT
+    );
+  `);
+  console.log('Database schema initialized');
+} catch (err) {
+  console.error('Failed to initialize database schema:', err);
+  process.exit(1);
+}
 
 // Seed initial data for empresas if empty
 const empresasCount = db.prepare('SELECT COUNT(*) as count FROM empresas').get() as { count: number };
@@ -79,13 +85,19 @@ if (veiculosCount.count === 0) {
 export const app = express();
 app.use(express.json());
 
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // --- Registrations API (Empresas, Colaboradores, Veículos) ---
 
 // Empresas
-app.get('/api/empresas', (req, res) => {
+app.get('/api/empresas', async (req, res) => {
   res.json(db.prepare('SELECT * FROM empresas').all());
 });
-app.post('/api/empresas', (req, res) => {
+
+app.post('/api/empresas', async (req, res) => {
   const { razaoSocial, cnpj } = req.body;
   try {
     const result = db.prepare('INSERT INTO empresas (razaoSocial, cnpj) VALUES (?, ?)').run(razaoSocial, cnpj);
@@ -94,7 +106,8 @@ app.post('/api/empresas', (req, res) => {
     res.status(500).json({ success: false, message: 'Erro ao salvar empresa' });
   }
 });
-app.put('/api/empresas/:id', (req, res) => {
+
+app.put('/api/empresas/:id', async (req, res) => {
   const { razaoSocial, cnpj } = req.body;
   try {
     db.prepare('UPDATE empresas SET razaoSocial = ?, cnpj = ? WHERE id = ?').run(razaoSocial, cnpj, req.params.id);
@@ -103,7 +116,8 @@ app.put('/api/empresas/:id', (req, res) => {
     res.status(500).json({ success: false, message: 'Erro ao atualizar empresa' });
   }
 });
-app.delete('/api/empresas/:id', (req, res) => {
+
+app.delete('/api/empresas/:id', async (req, res) => {
   try {
     db.prepare('DELETE FROM empresas WHERE id = ?').run(req.params.id);
     res.json({ success: true });
@@ -113,10 +127,11 @@ app.delete('/api/empresas/:id', (req, res) => {
 });
 
 // Colaboradores
-app.get('/api/colaboradores', (req, res) => {
+app.get('/api/colaboradores', async (req, res) => {
   res.json(db.prepare('SELECT * FROM colaboradores').all());
 });
-app.post('/api/colaboradores', (req, res) => {
+
+app.post('/api/colaboradores', async (req, res) => {
   const { nome, cpf, cargo, cnh, validadeCnh } = req.body;
   try {
     const result = db.prepare('INSERT INTO colaboradores (nome, cpf, cargo, cnh, validadeCnh) VALUES (?, ?, ?, ?, ?)').run(nome, cpf, cargo, cnh, validadeCnh);
@@ -125,7 +140,8 @@ app.post('/api/colaboradores', (req, res) => {
     res.status(500).json({ success: false, message: 'Erro ao salvar colaborador' });
   }
 });
-app.put('/api/colaboradores/:id', (req, res) => {
+
+app.put('/api/colaboradores/:id', async (req, res) => {
   const { nome, cpf, cargo, cnh, validadeCnh } = req.body;
   try {
     db.prepare('UPDATE colaboradores SET nome = ?, cpf = ?, cargo = ?, cnh = ?, validadeCnh = ? WHERE id = ?').run(nome, cpf, cargo, cnh, validadeCnh, req.params.id);
@@ -134,7 +150,8 @@ app.put('/api/colaboradores/:id', (req, res) => {
     res.status(500).json({ success: false, message: 'Erro ao atualizar colaborador' });
   }
 });
-app.delete('/api/colaboradores/:id', (req, res) => {
+
+app.delete('/api/colaboradores/:id', async (req, res) => {
   try {
     db.prepare('DELETE FROM colaboradores WHERE id = ?').run(req.params.id);
     res.json({ success: true });
@@ -144,10 +161,11 @@ app.delete('/api/colaboradores/:id', (req, res) => {
 });
 
 // Veículos
-app.get('/api/veiculos', (req, res) => {
+app.get('/api/veiculos', async (req, res) => {
   res.json(db.prepare('SELECT * FROM veiculos').all());
 });
-app.post('/api/veiculos', (req, res) => {
+
+app.post('/api/veiculos', async (req, res) => {
   const { marcaModelo, placa, renavam, cor, anoModelo } = req.body;
   try {
     const result = db.prepare('INSERT INTO veiculos (marcaModelo, placa, renavam, cor, anoModelo) VALUES (?, ?, ?, ?, ?)').run(marcaModelo, placa, renavam, cor, anoModelo);
@@ -156,7 +174,8 @@ app.post('/api/veiculos', (req, res) => {
     res.status(500).json({ success: false, message: 'Erro ao salvar veículo' });
   }
 });
-app.put('/api/veiculos/:id', (req, res) => {
+
+app.put('/api/veiculos/:id', async (req, res) => {
   const { marcaModelo, placa, renavam, cor, anoModelo } = req.body;
   try {
     db.prepare('UPDATE veiculos SET marcaModelo = ?, placa = ?, renavam = ?, cor = ?, anoModelo = ? WHERE id = ?').run(marcaModelo, placa, renavam, cor, anoModelo, req.params.id);
@@ -165,7 +184,8 @@ app.put('/api/veiculos/:id', (req, res) => {
     res.status(500).json({ success: false, message: 'Erro ao atualizar veículo' });
   }
 });
-app.delete('/api/veiculos/:id', (req, res) => {
+
+app.delete('/api/veiculos/:id', async (req, res) => {
   try {
     db.prepare('DELETE FROM veiculos WHERE id = ?').run(req.params.id);
     res.json({ success: true });
@@ -177,32 +197,42 @@ app.delete('/api/veiculos/:id', (req, res) => {
 // --- End Registrations API ---
 
 // Checklists API
-app.post('/api/checklists', (req, res) => {
+app.post('/api/checklists', async (req, res) => {
+  const { userId, ...checklistData } = req.body;
   try {
-    const data = JSON.stringify(req.body);
-    const result = db.prepare('INSERT INTO checklists (data) VALUES (?)').run(data);
+    const data = JSON.stringify(checklistData);
+    const result = db.prepare('INSERT INTO checklists (user_id, data) VALUES (?, ?)').run(userId, data);
     res.json({ success: true, id: result.lastInsertRowid });
   } catch (error: any) {
     res.status(500).json({ success: false, message: 'Erro ao salvar checklist' });
   }
 });
 
-app.get('/api/checklists', (req, res) => {
+app.get('/api/checklists', async (req, res) => {
+  const { userId, role } = req.query;
   try {
-    const checklists = db.prepare('SELECT * FROM checklists ORDER BY created_at DESC').all();
+    const checklists = db.prepare(`
+      SELECT c.*, u.username as creator_name 
+      FROM checklists c 
+      LEFT JOIN users u ON c.user_id = u.id 
+      ORDER BY c.created_at DESC
+    `).all();
+
     res.json(checklists.map((c: any) => ({
       id: c.id,
       created_at: c.created_at,
+      creator_name: c.creator_name,
       data: JSON.parse(c.data)
     })));
   } catch (error: any) {
+    console.error(error);
     res.status(500).json({ success: false, message: 'Erro ao buscar checklists' });
   }
 });
 
-app.get('/api/checklists/:id', (req, res) => {
+app.get('/api/checklists/:id', async (req, res) => {
+  const { id } = req.params;
   try {
-    const { id } = req.params;
     const checklist = db.prepare('SELECT * FROM checklists WHERE id = ?').get(id) as any;
     if (checklist) {
       res.json({
@@ -218,10 +248,11 @@ app.get('/api/checklists/:id', (req, res) => {
   }
 });
 
-app.put('/api/checklists/:id', (req, res) => {
+app.put('/api/checklists/:id', async (req, res) => {
+  const { id } = req.params;
+  const checklistData = req.body;
   try {
-    const { id } = req.params;
-    const data = JSON.stringify(req.body);
+    const data = JSON.stringify(checklistData);
     db.prepare('UPDATE checklists SET data = ? WHERE id = ?').run(data, id);
     res.json({ success: true });
   } catch (error: any) {
@@ -229,9 +260,9 @@ app.put('/api/checklists/:id', (req, res) => {
   }
 });
 
-app.delete('/api/checklists/:id', (req, res) => {
+app.delete('/api/checklists/:id', async (req, res) => {
+  const { id } = req.params;
   try {
-    const { id } = req.params;
     db.prepare('DELETE FROM checklists WHERE id = ?').run(id);
     res.json({ success: true });
   } catch (error: any) {
@@ -239,65 +270,54 @@ app.delete('/api/checklists/:id', (req, res) => {
   }
 });
 
-// Auth API
-app.post('/api/login', (req, res) => {
-  const { username, password } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE username = ? AND password = ?').get(username, password) as any;
-  
-  if (user) {
-    res.json({ 
-      success: true, 
-      user: { id: user.id, username: user.username, role: user.role } 
-    });
-  } else {
-    res.status(401).json({ success: false, message: 'Credenciais inválidas' });
-  }
-});
-
-app.post('/api/register', (req, res) => {
-  const { username, password, role } = req.body;
+// Sync user from Firebase to SQLite
+app.post('/api/sync-user', async (req, res) => {
+  const { id, username, role } = req.body;
   try {
-    const result = db.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)').run(username, password, role || 'common');
-    res.json({ 
-      success: true, 
-      user: { id: result.lastInsertRowid, username, role: role || 'common' } 
-    });
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as any;
+    if (user) {
+      res.json({ success: true, user: { id: user.id, username: user.username, role: user.role } });
+    } else {
+      // Check if it's the first user or if it's a known admin email
+      const isFirstUser = (db.prepare('SELECT COUNT(*) as count FROM users').get() as any).count === 0;
+      const finalRole = isFirstUser || username === 'admin@exemplo.com' ? 'admin' : (role || 'common');
+      
+      db.prepare('INSERT INTO users (id, username, role) VALUES (?, ?, ?)').run(id, username, finalRole);
+      res.json({ success: true, user: { id, username, role: finalRole } });
+    }
   } catch (error: any) {
-    res.status(400).json({ success: false, message: 'Usuário já existe' });
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Erro ao sincronizar usuário' });
   }
 });
 
 // User Management API (Admin only)
-app.get('/api/users', (req, res) => {
+app.get('/api/users', async (req, res) => {
   const users = db.prepare('SELECT id, username, role FROM users').all();
   res.json(users);
 });
 
-app.post('/api/users', (req, res) => {
-  const { username, password, role } = req.body;
+app.post('/api/users', async (req, res) => {
+  const { id, username, role } = req.body;
   try {
-    db.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)').run(username, password, role);
+    db.prepare('INSERT INTO users (id, username, role) VALUES (?, ?, ?)').run(id, username, role);
     res.json({ success: true });
   } catch (error: any) {
-    res.status(400).json({ success: false, message: 'Usuário já existe' });
+    res.status(400).json({ success: false, message: 'Erro ao criar usuário' });
   }
 });
 
-app.delete('/api/users/:id', (req, res) => {
+app.delete('/api/users/:id', async (req, res) => {
   const { id } = req.params;
   db.prepare('DELETE FROM users WHERE id = ?').run(id);
   res.json({ success: true });
 });
 
-app.put('/api/users/:id', (req, res) => {
+app.put('/api/users/:id', async (req, res) => {
   const { id } = req.params;
-  const { username, password, role } = req.body;
+  const { username, role } = req.body;
   try {
-    if (password) {
-      db.prepare('UPDATE users SET username = ?, password = ?, role = ? WHERE id = ?').run(username, password, role, id);
-    } else {
-      db.prepare('UPDATE users SET username = ?, role = ? WHERE id = ?').run(username, role, id);
-    }
+    db.prepare('UPDATE users SET username = ?, role = ? WHERE id = ?').run(username, role, id);
     res.json({ success: true });
   } catch (error: any) {
     res.status(400).json({ success: false, message: 'Erro ao atualizar usuário' });
@@ -305,7 +325,6 @@ app.put('/api/users/:id', (req, res) => {
 });
 
 async function startServer() {
-  // Vite middleware
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
@@ -327,3 +346,4 @@ async function startServer() {
 }
 
 startServer();
+

@@ -12,6 +12,17 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { db_firebase } from '../lib/firebase';
+import { 
+  collection, 
+  getDocs, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc,
+  query,
+  orderBy
+} from 'firebase/firestore';
 
 type Tab = 'empresas' | 'colaboradores' | 'veiculos';
 
@@ -26,14 +37,28 @@ export default function Registrations() {
   const [formData, setFormData] = useState<any>({});
   const [submitting, setSubmitting] = useState(false);
 
+  const userStr = localStorage.getItem('fleetcheck_user');
+  const user = userStr ? JSON.parse(userStr) : null;
+  const isAdmin = user?.role === 'admin';
+
   const fetchData = async () => {
+    if (!isAdmin) return;
     setLoading(true);
     try {
-      const response = await fetch(`/api/${activeTab}`);
-      const result = await response.json();
-      setData(result);
-    } catch (err) {
-      setError(`Erro ao carregar ${activeTab}`);
+      const q = query(collection(db_firebase, activeTab));
+      const querySnapshot = await getDocs(q);
+      const items = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setData(items);
+    } catch (err: any) {
+      console.error('Error fetching data:', err);
+      if (err.code === 'permission-denied') {
+        setError('Erro de Permissão: O banco de dados Firestore está bloqueado. Verifique as regras no console.');
+      } else {
+        setError(`Erro ao carregar ${activeTab} do Firebase`);
+      }
     } finally {
       setLoading(false);
     }
@@ -54,13 +79,18 @@ export default function Registrations() {
     setShowModal(true);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Tem certeza que deseja excluir este item?')) return;
     try {
-      await fetch(`/api/${activeTab}/${id}`, { method: 'DELETE' });
+      await deleteDoc(doc(db_firebase, activeTab, id));
       fetchData();
-    } catch (err) {
-      setError(`Erro ao excluir item`);
+    } catch (err: any) {
+      console.error('Error deleting item:', err);
+      if (err.code === 'permission-denied') {
+        setError('Erro de Permissão: Você não tem permissão para excluir este item.');
+      } else {
+        setError(`Erro ao excluir item do Firebase`);
+      }
     }
   };
 
@@ -68,23 +98,23 @@ export default function Registrations() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const url = editingItem ? `/api/${activeTab}/${editingItem.id}` : `/api/${activeTab}`;
-      const method = editingItem ? 'PUT' : 'POST';
-      
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-      
-      if (response.ok) {
-        setShowModal(false);
-        fetchData();
+      if (editingItem) {
+        const itemRef = doc(db_firebase, activeTab, editingItem.id);
+        const { id, ...updateData } = formData;
+        await updateDoc(itemRef, updateData);
       } else {
-        setError('Erro ao salvar item');
+        await addDoc(collection(db_firebase, activeTab), formData);
       }
-    } catch (err) {
-      setError('Erro de conexão ao salvar item');
+      
+      setShowModal(false);
+      fetchData();
+    } catch (err: any) {
+      console.error('Error saving item:', err);
+      if (err.code === 'permission-denied') {
+        setError('Erro de Permissão: O banco de dados Firestore está bloqueado. Verifique as regras no console.');
+      } else {
+        setError('Erro ao salvar no Firebase. Verifique as regras de segurança.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -126,6 +156,16 @@ export default function Registrations() {
               className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
               value={formData.nome || ''}
               onChange={e => setFormData({...formData, nome: e.target.value})}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">E-mail Corporativo (para identificação automática)</label>
+            <input 
+              type="email"
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
+              value={formData.email || ''}
+              onChange={e => setFormData({...formData, email: e.target.value})}
+              placeholder="exemplo@empresa.com"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -228,6 +268,16 @@ export default function Registrations() {
       );
     }
   };
+
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <AlertCircle className="w-12 h-12 text-red-500" />
+        <h2 className="text-xl font-bold text-zinc-900">Acesso Negado</h2>
+        <p className="text-zinc-500">Você não tem permissão para acessar esta área.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 pb-20">
