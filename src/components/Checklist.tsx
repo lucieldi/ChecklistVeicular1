@@ -147,12 +147,17 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
   }, []);
 
   const updateField = (section: keyof ChecklistData, field: string, value: any) => {
-    setData(prev => ({
-      ...prev,
-      [section]: typeof prev[section] === 'object' 
-        ? { ...prev[section], [field]: value }
-        : value
-    }));
+    setData(prev => {
+      const sectionValue = prev[section];
+      const isObject = sectionValue !== null && typeof sectionValue === 'object' && !Array.isArray(sectionValue);
+      
+      return {
+        ...prev,
+        [section]: isObject 
+          ? { ...sectionValue as object, [field]: value }
+          : value
+      };
+    });
   };
 
   const updateNestedField = (section: 'condicoesEntrega', subSection: string, field: string, value: any) => {
