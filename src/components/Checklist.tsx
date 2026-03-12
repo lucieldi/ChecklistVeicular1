@@ -19,7 +19,6 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { ChecklistData } from '../types';
 import PrintView from './PrintView';
-import CameraCapture from './CameraCapture';
 import SignaturePad from './SignaturePad';
 import html2pdf from 'html2pdf.js';
 import { db_firebase } from '../lib/firebase';
@@ -77,7 +76,6 @@ interface ChecklistProps {
 export default function Checklist({ editingId, initialData, onFinish }: ChecklistProps) {
   const [data, setData] = useState<ChecklistData>(initialData || defaultInitialData);
   const [step, setStep] = useState(1);
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   
   const [empresas, setEmpresas] = useState<any[]>([]);
@@ -229,14 +227,6 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
       ...prev,
       fotos: (prev.fotos || []).filter((_, index) => index !== indexToRemove)
     }));
-  };
-
-  const handleCameraCapture = (base64Image: string) => {
-    setData(prev => ({
-      ...prev,
-      fotos: [...(prev.fotos || []), base64Image]
-    }));
-    setIsCameraOpen(false);
   };
 
   const handlePrint = () => {
@@ -939,16 +929,9 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
               
               <div className="space-y-6">
                 <div className="flex flex-wrap gap-4">
-                  <button 
-                    onClick={() => setIsCameraOpen(true)}
-                    className="flex items-center justify-center gap-2 px-6 py-3 bg-[var(--color-brand-yellow)] text-zinc-900 rounded-xl font-semibold hover:bg-[var(--color-brand-yellow-hover)] transition-all cursor-pointer shadow-md"
-                  >
-                    <Camera className="w-5 h-5" />
-                    Tirar Foto
-                  </button>
-                  <label className="flex items-center justify-center gap-2 px-6 py-3 bg-white border border-zinc-200 text-zinc-900 rounded-xl font-semibold hover:bg-zinc-50 transition-all cursor-pointer shadow-sm">
+                  <label className="flex items-center justify-center gap-2 px-6 py-3 bg-zinc-900 text-white rounded-xl font-semibold hover:bg-zinc-800 transition-all cursor-pointer shadow-md">
                     <ImagePlus className="w-5 h-5" />
-                    Galeria
+                    Adicionar da Galeria
                     <input 
                       type="file" 
                       accept="image/*" 
@@ -1171,13 +1154,6 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
             {saveStatus.message}
           </motion.div>
         </div>
-      )}
-
-      {isCameraOpen && (
-        <CameraCapture 
-          onCapture={handleCameraCapture} 
-          onClose={() => setIsCameraOpen(false)} 
-        />
       )}
     </>
   );
