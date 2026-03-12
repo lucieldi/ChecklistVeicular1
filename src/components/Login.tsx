@@ -59,7 +59,7 @@ export default function Login({ onLogin }: LoginProps) {
       {/* Logo AJM */}
       <div className="absolute top-6 left-6 z-50">
         <img 
-          src="https://zpublicidade.com.br/wp-content/uploads/2013/07/Marca-AJM-Sem-Slogan.png" 
+          src="https://i.postimg.cc/TYnHNq5z/ajm-Photoroom-(1).png" 
           alt="AJM Condomínios" 
           className="object-contain h-10 md:h-12 w-auto"
           referrerPolicy="no-referrer"

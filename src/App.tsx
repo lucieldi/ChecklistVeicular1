@@ -159,7 +159,7 @@ export default function App() {
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2 md:gap-3">
             <img 
-              src="https://zpublicidade.com.br/wp-content/uploads/2013/07/Marca-AJM-Sem-Slogan.png" 
+              src="https://i.postimg.cc/TYnHNq5z/ajm-Photoroom-(1).png" 
               alt="AJM Condomínios" 
               className="h-7 md:h-10 w-auto"
               referrerPolicy="no-referrer"
