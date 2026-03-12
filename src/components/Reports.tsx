@@ -6,7 +6,8 @@ import {
   Download,
   Search,
   Filter,
-  FileDown
+  FileDown,
+  Eye
 } from 'lucide-react';
 import { ChecklistData } from '../types';
 import { db_firebase } from '../lib/firebase';
@@ -136,7 +137,7 @@ export default function Reports() {
     document.body.removeChild(link);
   };
 
-  const exportToPDF = async () => {
+  const exportToPDF = async (mode: 'download' | 'view' = 'download') => {
     const doc = new jsPDF();
     
     try {
@@ -173,10 +174,14 @@ export default function Reports() {
       headStyles: { fillColor: [26, 59, 92] }
     });
 
-    doc.save(`relatorio_checklists_${new Date().getTime()}.pdf`);
+    if (mode === 'view') {
+      window.open(doc.output('bloburl'), '_blank');
+    } else {
+      doc.save(`relatorio_checklists_${new Date().getTime()}.pdf`);
+    }
   };
 
-  const downloadIndividualPDF = async (record: ChecklistRecord) => {
+  const downloadIndividualPDF = async (record: ChecklistRecord, mode: 'download' | 'view' = 'download') => {
     const doc = new jsPDF();
     const data = record.data;
     
@@ -296,7 +301,11 @@ export default function Reports() {
     doc.text('Assinatura do Colaborador', 52, y, { align: 'center' });
     doc.text('Assinatura do Responsável', 158, y, { align: 'center' });
 
-    doc.save(`checklist_${record.id.substring(0, 8)}.pdf`);
+    if (mode === 'view') {
+      window.open(doc.output('bloburl'), '_blank');
+    } else {
+      doc.save(`checklist_${record.id.substring(0, 8)}.pdf`);
+    }
   };
 
   if (loading) {
@@ -326,7 +335,15 @@ export default function Reports() {
               CSV
             </button>
             <button 
-              onClick={exportToPDF}
+              onClick={() => exportToPDF('view')}
+              disabled={filteredChecklists.length === 0}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-zinc-200 text-zinc-700 rounded-xl font-bold hover:bg-zinc-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Eye className="w-4 h-4" />
+              Visualizar
+            </button>
+            <button 
+              onClick={() => exportToPDF('download')}
               disabled={filteredChecklists.length === 0}
               className="flex items-center justify-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-xl font-bold hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -404,13 +421,22 @@ export default function Reports() {
                       {record.data.veiculo.placa || '-'}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => downloadIndividualPDF(record)}
-                        className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-all"
-                        title="Baixar PDF"
-                      >
-                        <FileDown className="w-5 h-5" />
-                      </button>
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => downloadIndividualPDF(record, 'view')}
+                          className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-all"
+                          title="Visualizar PDF"
+                        >
+                          <Eye className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => downloadIndividualPDF(record, 'download')}
+                          className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-all"
+                          title="Baixar PDF"
+                        >
+                          <FileDown className="w-5 h-5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

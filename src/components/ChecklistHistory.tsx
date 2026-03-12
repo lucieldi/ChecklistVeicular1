@@ -8,7 +8,8 @@ import {
   Calendar,
   Car,
   User as UserIcon,
-  FileDown
+  FileDown,
+  Eye
 } from 'lucide-react';
 import { ChecklistData } from '../types';
 import { db_firebase } from '../lib/firebase';
@@ -98,7 +99,7 @@ export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
     }
   };
 
-  const downloadIndividualPDF = async (record: ChecklistRecord) => {
+  const downloadIndividualPDF = async (record: ChecklistRecord, mode: 'download' | 'view' = 'download') => {
     const doc = new jsPDF();
     const data = record.data;
     
@@ -218,7 +219,11 @@ export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
     doc.text('Assinatura do Colaborador', 52, y, { align: 'center' });
     doc.text('Assinatura do Responsável', 158, y, { align: 'center' });
 
-    doc.save(`checklist_${record.id.substring(0, 8)}.pdf`);
+    if (mode === 'view') {
+      window.open(doc.output('bloburl'), '_blank');
+    } else {
+      doc.save(`checklist_${record.id.substring(0, 8)}.pdf`);
+    }
   };
 
   const userStr = localStorage.getItem('fleetcheck_user');
@@ -299,7 +304,15 @@ export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
 
               <div className="flex items-center gap-2 pt-4 md:pt-0 border-t md:border-t-0 border-zinc-100">
                 <button 
-                  onClick={() => downloadIndividualPDF(record)}
+                  onClick={() => downloadIndividualPDF(record, 'view')}
+                  className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 rounded-xl font-bold transition-all"
+                  title="Visualizar PDF"
+                >
+                  <Eye className="w-4 h-4" />
+                  Ver
+                </button>
+                <button 
+                  onClick={() => downloadIndividualPDF(record, 'download')}
                   className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 rounded-xl font-bold transition-all"
                   title="Baixar PDF"
                 >
