@@ -14,59 +14,68 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
-    const getCameras = async () => {
+    let currentStream: MediaStream | null = null;
+
+    const initCamera = async () => {
       try {
-        // Request permission first to get labels
-        await navigator.mediaDevices.getUserMedia({ video: true }); 
+        setError('');
+        
+        // 1. Get initial stream to trigger permission prompt and get labels
+        const initialStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        
+        // 2. Enumerate devices
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter(device => device.kind === 'videoinput');
         setCameras(videoDevices);
-        if (videoDevices.length > 0) {
-          // Prefer back camera if available
-          const backCamera = videoDevices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('traseira'));
-          setSelectedCameraId(backCamera ? backCamera.deviceId : videoDevices[0].deviceId);
-        } else {
-          setError('Nenhuma câmera encontrada no dispositivo.');
-        }
-      } catch (err: any) {
-        console.error("Error accessing camera:", err);
-        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-          setError('Permissão negada. Clique no ícone de cadeado na barra de endereços do navegador, permita o acesso à câmera e recarregue a página.');
-        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-          setError('Nenhuma câmera encontrada neste dispositivo.');
-        } else {
-          setError('Erro ao acessar a câmera: ' + (err.message || 'Erro desconhecido.'));
-        }
-      }
-    };
-    getCameras();
-  }, []);
 
-  useEffect(() => {
-    let currentStream: MediaStream | null = null;
+        // 3. Determine which camera to use
+        let targetDeviceId = selectedCameraId;
+        if (!targetDeviceId && videoDevices.length > 0) {
+          const backCamera = videoDevices.find(d => 
+            d.label.toLowerCase().includes('back') || 
+            d.label.toLowerCase().includes('traseira') ||
+            d.label.toLowerCase().includes('environment')
+          );
+          targetDeviceId = backCamera ? backCamera.deviceId : videoDevices[0].deviceId;
+          setSelectedCameraId(targetDeviceId);
+        }
 
-    const startCamera = async () => {
-      try {
-        const newStream = await navigator.mediaDevices.getUserMedia({
-          video: { 
-            deviceId: selectedCameraId ? { exact: selectedCameraId } : undefined,
+        // 4. Stop initial stream before starting the specific one
+        initialStream.getTracks().forEach(track => track.stop());
+
+        // 5. Start the selected camera with robust constraints
+        const constraints: MediaStreamConstraints = {
+          video: {
+            deviceId: targetDeviceId ? { ideal: targetDeviceId } : undefined,
+            facingMode: targetDeviceId ? undefined : 'environment',
             width: { ideal: 1280 },
             height: { ideal: 720 }
           }
-        });
-        currentStream = newStream;
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        currentStream = stream;
+        
         if (videoRef.current) {
-          videoRef.current.srcObject = newStream;
+          videoRef.current.srcObject = stream;
+          // Ensure video plays
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current?.play().catch(e => console.error("Error playing video:", e));
+          };
         }
-      } catch (err) {
-        console.error("Error starting camera:", err);
-        setError('Erro ao iniciar a câmera selecionada.');
+      } catch (err: any) {
+        console.error("Camera initialization error:", err);
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          setError('Permissão negada. Verifique as configurações de privacidade do seu navegador e do sistema operacional.');
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          setError('Nenhuma câmera encontrada neste dispositivo.');
+        } else {
+          setError('Erro ao acessar a câmera. Certifique-se de que nenhuma outra aba ou aplicativo está usando a câmera.');
+        }
       }
     };
 
-    if (selectedCameraId) {
-      startCamera();
-    }
+    initCamera();
 
     return () => {
       if (currentStream) {
@@ -107,7 +116,13 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
           {error ? (
             <div className="text-white text-center p-6">
               <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-500" />
-              <p>{error}</p>
+              <p className="mb-6">{error}</p>
+              <button 
+                onClick={() => window.location.reload()}
+                className="px-6 py-2 bg-white text-zinc-900 rounded-xl font-bold hover:bg-zinc-100 transition-colors"
+              >
+                Recarregar Página
+              </button>
             </div>
           ) : (
             <video 

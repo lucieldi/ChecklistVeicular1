@@ -26,7 +26,7 @@ import { db_firebase } from '../lib/firebase';
 import { collection, addDoc, updateDoc, doc, getDocs, query } from 'firebase/firestore';
 
 const defaultInitialData: ChecklistData = {
-  empresa: { razaoSocial: '', cnpj: '' },
+  empresa: { razaoSocial: '', razaoSocial2: '', cnpj: '', cnpj2: '', obs: '' },
   colaborador: { id: undefined, nome: '', cpf: '', cargo: '', cnh: '', validadeCnh: '' },
   veiculo: {
     marcaModelo: '',
@@ -48,7 +48,7 @@ const defaultInitialData: ChecklistData = {
       retrovisores: false, farois: false, pneus: false, rodas: false, obs: ''
     },
     interna: {
-      bancos: false, painel: false, multimidia: false, arCondicionado: false,
+      bancos: false, painel: false, arCondicionado: false,
       tapetes: false, cintos: false, obs: ''
     },
     mecanica: {
@@ -57,9 +57,9 @@ const defaultInitialData: ChecklistData = {
     },
   },
   acessorios: {
-    documento: false, manual: false, chavePrincipal: false, chaveReserva: false,
+    documento: false, manual: false, chavePrincipal: false,
     triangulo: false, macaco: false, chaveRoda: false, estepe: false,
-    cartaoCombustivel: false, controlePortao: false, obs: ''
+    cartaoCombustivel: false, controlePortao: false, giroflex: false, obs: ''
   },
   combustivelEntrega: '',
   condicoesDevolucao: '',
@@ -240,6 +240,11 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
   };
 
   const handlePrint = () => {
+    // Validate all steps up to current before printing
+    for (let i = 1; i <= step; i++) {
+      if (!validateStep(i)) return;
+    }
+    
     const element = document.getElementById('print-view');
     if (!element) return;
 
@@ -262,7 +267,68 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
     });
   };
 
+  const validateStep = (stepToValidate: number) => {
+    const errors: string[] = [];
+
+    if (stepToValidate === 1) {
+      if (!data.empresa.razaoSocial) errors.push("Razão Social");
+      if (!data.empresa.cnpj) errors.push("CNPJ");
+      if (!data.colaborador.nome) errors.push("Nome do Colaborador");
+      if (!data.colaborador.cpf) errors.push("CPF");
+      if (!data.colaborador.cargo) errors.push("Cargo");
+      if (!data.colaborador.cnh) errors.push("CNH");
+      if (!data.colaborador.validadeCnh) errors.push("Validade CNH");
+    }
+
+    if (stepToValidate === 2) {
+      if (!data.veiculo.marcaModelo) errors.push("Marca/Modelo");
+      if (!data.veiculo.placa) errors.push("Placa");
+      if (!data.veiculo.renavam) errors.push("Renavam");
+      if (!data.veiculo.cor) errors.push("Cor");
+      if (!data.veiculo.anoModelo) errors.push("Ano/Modelo");
+      if (!data.veiculo.kmEntrega) errors.push("KM Inicial");
+      if (!data.veiculo.dataEntrega) errors.push("Data Inicial");
+      if (!data.veiculo.horaEntrega) errors.push("Hora Inicial");
+      if (!data.veiculo.destino) errors.push("Destino");
+    }
+
+    if (stepToValidate === 4) {
+      if (!data.combustivelEntrega) errors.push("Nível de Combustível");
+    }
+
+    if (stepToValidate === 5) {
+      if (!data.condicoesDevolucao.trim()) errors.push("Condições na Devolução");
+    }
+
+    if (stepToValidate === 6) {
+      if (!data.assinaturaColaborador) errors.push("Assinatura do Colaborador");
+      if (!data.assinaturaResponsavel) errors.push("Assinatura do Responsável");
+    }
+
+    if (errors.length > 0) {
+      setSaveStatus({ 
+        type: 'error', 
+        message: `Preencha os campos obrigatórios: ${errors.join(', ')}` 
+      });
+      setTimeout(() => setSaveStatus(null), 4000);
+      return false;
+    }
+    return true;
+  };
+
   const handleSave = async () => {
+    // Validate all steps before saving
+    for (let i = 1; i <= step; i++) {
+      if (!validateStep(i)) return;
+    }
+    if (step === 6) {
+      if (!data.assinaturaColaborador || !data.assinaturaResponsavel) {
+        setSaveStatus({ type: 'error', message: 'Assinaturas são obrigatórias para finalizar.' });
+        setTimeout(() => setSaveStatus(null), 3000);
+        return;
+      }
+    }
+
     try {
       const userStr = localStorage.getItem('fleetcheck_user');
       const user = userStr ? JSON.parse(userStr) : null;
@@ -311,19 +377,17 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">RAZÃO SOCIAL</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">RAZÃO SOCIAL <span className="text-red-500">*</span></label>
                   <select 
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
-                    value={data.empresa.id || data.empresa.razaoSocial}
+                    value={data.empresa.razaoSocial}
                     onChange={e => {
                       const val = e.target.value;
-                      const empresa = empresas.find(emp => emp.id.toString() === val || emp.razaoSocial === val);
+                      const empresa = empresas.find(emp => emp.razaoSocial === val);
                       if (empresa) {
-                        updateField('empresa', 'id', empresa.id);
                         updateField('empresa', 'razaoSocial', empresa.razaoSocial);
-                        updateField('empresa', 'cnpj', empresa.cnpj);
+                        updateField('empresa', 'cnpj', empresa.cnpj || '');
                       } else {
-                        updateField('empresa', 'id', undefined);
                         updateField('empresa', 'razaoSocial', val);
                         updateField('empresa', 'cnpj', '');
                       }
@@ -331,17 +395,60 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   >
                     <option value="">Selecione uma empresa...</option>
                     {empresas.map(emp => (
-                      <option key={emp.id} value={emp.id}>{emp.razaoSocial}</option>
+                      <option key={emp.id} value={emp.razaoSocial}>{emp.razaoSocial}</option>
                     ))}
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">CNPJ</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">CNPJ <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
                     value={data.empresa.cnpj}
                     onChange={e => updateField('empresa', 'cnpj', e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">RAZÃO SOCIAL 2</label>
+                  <select 
+                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
+                    value={data.empresa.razaoSocial2}
+                    onChange={e => {
+                      const val = e.target.value;
+                      const empresa = empresas.find(emp => emp.razaoSocial === val);
+                      if (empresa) {
+                        updateField('empresa', 'razaoSocial2', empresa.razaoSocial);
+                        updateField('empresa', 'cnpj2', empresa.cnpj || '');
+                      } else {
+                        updateField('empresa', 'razaoSocial2', val);
+                        updateField('empresa', 'cnpj2', '');
+                      }
+                    }}
+                  >
+                    <option value="">Selecione uma empresa...</option>
+                    {empresas.map(emp => (
+                      <option key={emp.id} value={emp.razaoSocial}>{emp.razaoSocial}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">CNPJ 2</label>
+                  <input 
+                    type="text" 
+                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
+                    value={data.empresa.cnpj2}
+                    onChange={e => updateField('empresa', 'cnpj2', e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">OBSERVAÇÕES</label>
+                  <input 
+                    type="text" 
+                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
+                    value={data.empresa.obs}
+                    onChange={e => updateField('empresa', 'obs', e.target.value)}
                   />
                 </div>
               </div>
@@ -356,7 +463,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5 md:col-span-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">NOME COMPLETO</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">NOME COMPLETO <span className="text-red-500">*</span></label>
                   <input 
                     type="text"
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
@@ -366,7 +473,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">CPF</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">CPF <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
@@ -375,7 +482,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">CARGO</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">CARGO <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
@@ -384,7 +491,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">CNH Nº</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">CNH Nº <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
@@ -393,7 +500,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">VALIDADE</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">VALIDADE <span className="text-red-500">*</span></label>
                   <input 
                     type="date" 
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
@@ -421,7 +528,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-1.5 lg:col-span-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Veículo</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">MARCA/MODELO <span className="text-red-500">*</span></label>
                   <select 
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
                     value={data.veiculo.id || data.veiculo.marcaModelo}
@@ -454,7 +561,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Placa</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">PLACA <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
@@ -463,7 +570,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Renavam</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">RENAVAM <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
@@ -472,7 +579,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Cor</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">COR <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
@@ -481,7 +588,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Ano/Modelo</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">ANO/MODELO <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
@@ -495,16 +602,16 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                     <h3 className="text-xs md:text-sm font-bold text-zinc-400 uppercase tracking-widest text-center sm:text-left">Inicial/Recebimento</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-1 gap-3">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold uppercase text-zinc-400">KM</label>
+                        <label className="text-[10px] font-bold uppercase text-zinc-400">KM <span className="text-red-500">*</span></label>
                         <input type="text" className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-sm" value={data.veiculo.kmEntrega} onChange={e => updateField('veiculo', 'kmEntrega', e.target.value)} />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase text-zinc-400">Data</label>
+                          <label className="text-[10px] font-bold uppercase text-zinc-400">Data <span className="text-red-500">*</span></label>
                           <input type="date" className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-sm" value={data.veiculo.dataEntrega} onChange={e => updateField('veiculo', 'dataEntrega', e.target.value)} />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase text-zinc-400">Hora</label>
+                          <label className="text-[10px] font-bold uppercase text-zinc-400">Hora <span className="text-red-500">*</span></label>
                           <input type="time" className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-sm" value={data.veiculo.horaEntrega} onChange={e => updateField('veiculo', 'horaEntrega', e.target.value)} />
                         </div>
                       </div>
@@ -533,7 +640,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                 </div>
 
                 <div className="space-y-1.5 md:col-span-2 lg:col-span-3">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Destino/Trajetos/Motivos</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">DESTINO/ROTA <span className="text-red-500">*</span></label>
                   <textarea 
                     rows={3}
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all resize-none"
@@ -629,7 +736,6 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                       const labels: any = {
                         bancos: 'Bancos preservados',
                         painel: 'Painel sem avarias',
-                        multimidia: 'Sistema multimídia',
                         arCondicionado: 'Ar-condicionado',
                         tapetes: 'Tapetes presentes',
                         cintos: 'Cintos de segurança'
@@ -731,17 +837,23 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {Object.entries(data.acessorios).map(([key, value]) => {
                   if (key === 'obs') return null;
+                  
+                  // Only show giroflex for Fiat Mobi Like
+                  if (key === 'giroflex' && data.veiculo.marcaModelo !== 'Fiat Mobi Like') {
+                    return null;
+                  }
+
                   const labels: any = {
                     documento: 'Documento do veículo',
                     manual: 'Manual do proprietário',
                     chavePrincipal: 'Chave principal',
-                    chaveReserva: 'Chave reserva',
                     triangulo: 'Triângulo',
                     macaco: 'Macaco',
                     chaveRoda: 'Chave de roda',
                     estepe: 'Estepe',
                     cartaoCombustivel: 'Cartão combustível',
-                    controlePortao: 'Controle portão empresa'
+                    controlePortao: 'Controle portão empresa',
+                    giroflex: 'Giroflex'
                   };
                   return (
                     <label key={key} className="flex items-center gap-3 p-3 rounded-xl border border-zinc-100 hover:bg-zinc-50 cursor-pointer transition-colors">
@@ -769,7 +881,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                 <div className="p-2 bg-zinc-100 rounded-lg">
                   <Fuel className="w-5 h-5 text-zinc-600" />
                 </div>
-                <h2 className="text-xl font-semibold text-zinc-900">6. Nível de Combustível Inicial/Recebimento</h2>
+                <h2 className="text-xl font-semibold text-zinc-900">6. Nível de Combustível Inicial/Recebimento <span className="text-red-500">*</span></h2>
               </div>
               <div className="flex flex-wrap gap-2 md:gap-3">
                 {['Cheio', '3/4', '2/4', '1/4', 'Reserva'].map((level) => (
@@ -801,7 +913,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                 <div className="p-2 bg-zinc-100 rounded-lg">
                   <AlertCircle className="w-5 h-5 text-zinc-600" />
                 </div>
-                <h2 className="text-xl font-semibold text-zinc-900">7. Condições na Finalização/Devolução</h2>
+                <h2 className="text-xl font-semibold text-zinc-900">7. Condições na Finalização/Devolução <span className="text-red-500">*</span></h2>
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Descrição de eventuais avarias ou ocorrências</label>
@@ -893,7 +1005,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                     onSave={(sig) => updateField('assinaturaColaborador', '', sig)} 
                   />
                   <div className="h-px bg-zinc-300 w-full max-w-md mt-2"></div>
-                  <p className="text-center text-[10px] font-bold uppercase tracking-widest text-zinc-400">Assinatura do Colaborador</p>
+                  <p className="text-center text-[10px] font-bold uppercase tracking-widest text-zinc-400">Assinatura do Colaborador <span className="text-red-500">*</span></p>
                   <p className="text-center text-sm text-zinc-900 font-bold uppercase">{data.colaborador.nome || 'NOME DO COLABORADOR'}</p>
                 </div>
                 <div className="space-y-4 flex flex-col items-center">
@@ -902,7 +1014,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                     onSave={(sig) => updateField('assinaturaResponsavel', '', sig)} 
                   />
                   <div className="h-px bg-zinc-300 w-full max-w-md mt-2"></div>
-                  <p className="text-center text-[10px] font-bold uppercase tracking-widest text-zinc-400">Assinatura do Responsável Empresa</p>
+                  <p className="text-center text-[10px] font-bold uppercase tracking-widest text-zinc-400">Assinatura do Responsável Empresa <span className="text-red-500">*</span></p>
                   <p className="text-center text-sm text-zinc-900 font-bold uppercase">{data.empresa.razaoSocial || 'NOME DA EMPRESA'}</p>
                 </div>
               </div>
@@ -994,7 +1106,11 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
               
               {step < totalSteps ? (
                 <button
-                  onClick={() => setStep(s => s + 1)}
+                  onClick={() => {
+                    if (validateStep(step)) {
+                      setStep(s => s + 1);
+                    }
+                  }}
                   className="flex items-center justify-center gap-2 px-8 md:px-10 py-3 bg-zinc-900 text-white rounded-xl font-bold hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-200 uppercase tracking-widest text-[10px] md:text-xs"
                 >
                   Próximo

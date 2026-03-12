@@ -9,7 +9,10 @@ export interface ChecklistData {
   empresa: {
     id?: number;
     razaoSocial: string;
+    razaoSocial2: string;
     cnpj: string;
+    cnpj2: string;
+    obs: string;
   };
   colaborador: {
     id?: string | number;
@@ -49,7 +52,6 @@ export interface ChecklistData {
     interna: {
       bancos: boolean;
       painel: boolean;
-      multimidia: boolean;
       arCondicionado: boolean;
       tapetes: boolean;
       cintos: boolean;
@@ -68,13 +70,13 @@ export interface ChecklistData {
     documento: boolean;
     manual: boolean;
     chavePrincipal: boolean;
-    chaveReserva: boolean;
     triangulo: boolean;
     macaco: boolean;
     chaveRoda: boolean;
     estepe: boolean;
     cartaoCombustivel: boolean;
     controlePortao: boolean;
+    giroflex?: boolean;
     obs: string;
   };
   combustivelEntrega: 'Cheio' | '3/4' | '2/4' | '1/4' | 'Reserva' | '';

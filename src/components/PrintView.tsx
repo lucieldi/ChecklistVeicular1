@@ -20,6 +20,9 @@ export default function PrintView({ data }: PrintViewProps) {
           <div className="grid grid-cols-2 gap-4">
             <div><span className="font-semibold">Razão Social:</span> {data.empresa.razaoSocial || '---'}</div>
             <div><span className="font-semibold">CNPJ:</span> {data.empresa.cnpj || '---'}</div>
+            <div><span className="font-semibold">Razão Social 2:</span> {data.empresa.razaoSocial2 || '---'}</div>
+            <div><span className="font-semibold">CNPJ 2:</span> {data.empresa.cnpj2 || '---'}</div>
+            <div className="col-span-2"><span className="font-semibold">Observações:</span> {data.empresa.obs || '---'}</div>
           </div>
         </section>
 
@@ -76,7 +79,6 @@ export default function PrintView({ data }: PrintViewProps) {
             <div className="grid grid-cols-4 gap-2 text-xs">
               <div>Bancos: {data.condicoesEntrega.interna.bancos ? 'OK' : 'N/A'}</div>
               <div>Painel: {data.condicoesEntrega.interna.painel ? 'OK' : 'N/A'}</div>
-              <div>Multimídia: {data.condicoesEntrega.interna.multimidia ? 'OK' : 'N/A'}</div>
               <div>Ar Condicionado: {data.condicoesEntrega.interna.arCondicionado ? 'OK' : 'N/A'}</div>
               <div>Tapetes: {data.condicoesEntrega.interna.tapetes ? 'OK' : 'N/A'}</div>
               <div>Cintos: {data.condicoesEntrega.interna.cintos ? 'OK' : 'N/A'}</div>
@@ -104,13 +106,15 @@ export default function PrintView({ data }: PrintViewProps) {
             <div>Documento (CRLV): {data.acessorios.documento ? 'Sim' : 'Não'}</div>
             <div>Manual: {data.acessorios.manual ? 'Sim' : 'Não'}</div>
             <div>Chave Principal: {data.acessorios.chavePrincipal ? 'Sim' : 'Não'}</div>
-            <div>Chave Reserva: {data.acessorios.chaveReserva ? 'Sim' : 'Não'}</div>
             <div>Triângulo: {data.acessorios.triangulo ? 'Sim' : 'Não'}</div>
             <div>Macaco: {data.acessorios.macaco ? 'Sim' : 'Não'}</div>
             <div>Chave de Roda: {data.acessorios.chaveRoda ? 'Sim' : 'Não'}</div>
             <div>Estepe: {data.acessorios.estepe ? 'Sim' : 'Não'}</div>
             <div>Cartão Combustível: {data.acessorios.cartaoCombustivel ? 'Sim' : 'Não'}</div>
             <div>Controle Portão: {data.acessorios.controlePortao ? 'Sim' : 'Não'}</div>
+            {data.veiculo.marcaModelo === 'Fiat Mobi Like' && (
+              <div>Giroflex: {data.acessorios.giroflex ? 'Sim' : 'Não'}</div>
+            )}
           </div>
           {data.acessorios.obs && <div className="text-xs mt-1 italic">Obs: {data.acessorios.obs}</div>}
         </section>
