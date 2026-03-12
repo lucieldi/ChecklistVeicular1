@@ -883,12 +883,12 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                 </div>
                 <h2 className="text-xl font-semibold text-zinc-900">6. Nível de Combustível Inicial/Recebimento <span className="text-red-500">*</span></h2>
               </div>
-              <div className="flex flex-wrap gap-2 md:gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-3">
                 {['Cheio', '3/4', '2/4', '1/4', 'Reserva'].map((level) => (
                   <button
                     key={level}
                     onClick={() => setData(prev => ({ ...prev, combustivelEntrega: level as any }))}
-                    className={`flex-1 min-w-[80px] px-4 md:px-6 py-2.5 md:py-3 rounded-xl border transition-all text-xs md:text-sm font-bold uppercase tracking-wider ${
+                    className={`px-3 py-3 rounded-xl border transition-all text-[10px] md:text-xs font-bold uppercase tracking-wider ${
                       data.combustivelEntrega === level 
                       ? 'bg-zinc-900 text-white border-zinc-900 shadow-md' 
                       : 'bg-white text-zinc-500 border-zinc-200 hover:border-zinc-400'
@@ -1081,7 +1081,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
 
         {/* Navigation */}
         <div className="fixed bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-zinc-50 via-zinc-50 to-transparent pointer-events-none z-[90]">
-          <div className="max-w-4xl mx-auto flex items-center justify-between gap-4 pointer-events-auto">
+          <div className="max-w-6xl mx-auto flex items-center justify-between gap-4 pointer-events-auto">
             <button
               disabled={step === 1}
               onClick={() => setStep(s => s - 1)}
@@ -1098,7 +1098,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
             <div className="flex items-center gap-2 md:gap-3">
               <button 
                 onClick={handlePrint}
-                className="p-3 bg-white border border-zinc-200 text-zinc-600 rounded-xl font-bold hover:bg-zinc-50 transition-all shadow-sm"
+                className="p-3 bg-white border border-zinc-200 text-zinc-600 rounded-xl font-bold hover:bg-zinc-50 transition-all shadow-sm hidden sm:block"
                 title="Imprimir PDF"
               >
                 <Printer className="w-5 h-5" />
@@ -1111,15 +1111,15 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                       setStep(s => s + 1);
                     }
                   }}
-                  className="flex items-center justify-center gap-2 px-8 md:px-10 py-3 bg-zinc-900 text-white rounded-xl font-bold hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-200 uppercase tracking-widest text-[10px] md:text-xs"
+                  className="flex items-center justify-center gap-2 px-6 md:px-10 py-3 bg-zinc-900 text-white rounded-xl font-bold hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-200 uppercase tracking-widest text-[10px] md:text-xs"
                 >
-                  Próximo
+                  <span className="sm:inline">Próximo</span>
                   <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
               ) : (
                 <button
                   onClick={handleSave}
-                  className="flex items-center justify-center gap-2 px-8 md:px-10 py-3 bg-zinc-900 text-white rounded-xl font-bold hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-200 uppercase tracking-widest text-[10px] md:text-xs"
+                  className="flex items-center justify-center gap-2 px-6 md:px-10 py-3 bg-zinc-900 text-white rounded-xl font-bold hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-200 uppercase tracking-widest text-[10px] md:text-xs"
                 >
                   <Save className="w-4 h-4 md:w-5 md:h-5" />
                   Finalizar

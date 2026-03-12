@@ -340,53 +340,55 @@ export default function Registrations() {
             <Loader2 className="w-8 h-8 text-zinc-400 animate-spin" />
           </div>
         ) : (
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-zinc-50 border-b border-zinc-200">
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-zinc-400">
-                  {activeTab === 'empresas' ? 'Razão Social' : activeTab === 'colaboradores' ? 'Nome' : 'Veículo'}
-                </th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-zinc-400">
-                  {activeTab === 'empresas' ? 'CNPJ' : activeTab === 'colaboradores' ? 'CPF' : 'Placa'}
-                </th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-zinc-400 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {data.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="px-6 py-8 text-center text-zinc-500">Nenhum registro encontrado.</td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[600px]">
+              <thead>
+                <tr className="bg-zinc-50 border-b border-zinc-200">
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-zinc-400">
+                    {activeTab === 'empresas' ? 'Razão Social' : activeTab === 'colaboradores' ? 'Nome' : 'Veículo'}
+                  </th>
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-zinc-400">
+                    {activeTab === 'empresas' ? 'CNPJ' : activeTab === 'colaboradores' ? 'CPF' : 'Placa'}
+                  </th>
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-zinc-400 text-right">Ações</th>
                 </tr>
-              ) : (
-                data.map((item) => (
-                  <tr key={item.id} className="hover:bg-zinc-50 transition-colors">
-                    <td className="px-6 py-4 font-semibold text-zinc-900">
-                      {activeTab === 'empresas' ? item.razaoSocial : activeTab === 'colaboradores' ? item.nome : item.marcaModelo}
-                    </td>
-                    <td className="px-6 py-4 text-zinc-500">
-                      {activeTab === 'empresas' ? item.cnpj : activeTab === 'colaboradores' ? item.cpf : item.placa}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button 
-                          onClick={() => handleOpenModal(item)}
-                          className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all"
-                        >
-                          <Pencil className="w-5 h-5" />
-                        </button>
-                        <button 
-                          onClick={() => handleDelete(item.id)}
-                          className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </td>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {data.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="px-6 py-8 text-center text-zinc-500">Nenhum registro encontrado.</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  data.map((item) => (
+                    <tr key={item.id} className="hover:bg-zinc-50 transition-colors">
+                      <td className="px-6 py-4 font-semibold text-zinc-900">
+                        {activeTab === 'empresas' ? item.razaoSocial : activeTab === 'colaboradores' ? item.nome : item.marcaModelo}
+                      </td>
+                      <td className="px-6 py-4 text-zinc-500">
+                        {activeTab === 'empresas' ? item.cnpj : activeTab === 'colaboradores' ? item.cpf : item.placa}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button 
+                            onClick={() => handleOpenModal(item)}
+                            className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all"
+                          >
+                            <Pencil className="w-5 h-5" />
+                          </button>
+                          <button 
+                            onClick={() => handleDelete(item.id)}
+                            className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

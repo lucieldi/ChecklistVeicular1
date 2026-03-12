@@ -155,25 +155,26 @@ export default function App() {
       )}
 
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-md border-b border-zinc-200 px-4 md:px-6 py-4 sticky top-0 z-[100]">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <header className="bg-white/80 backdrop-blur-md border-b border-zinc-200 px-4 md:px-6 py-3 md:py-4 sticky top-0 z-[100]">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2 md:gap-3">
             <img 
-              src="https://i.ibb.co/LzN2Yg1Z/logo.png" 
-              alt="FleetCheck Logo" 
-              className="h-8 md:h-10 w-auto"
+              src="https://zpublicidade.com.br/wp-content/uploads/2013/07/Marca-AJM-Sem-Slogan.png" 
+              alt="AJM Condomínios" 
+              className="h-7 md:h-10 w-auto"
               referrerPolicy="no-referrer"
             />
-            <div className="hidden sm:block">
-              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
+            <div className="hidden sm:block border-l border-zinc-200 pl-3">
+              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest leading-tight">
                 {user.role === 'admin' ? 'Painel Administrativo' : 'Acesso Colaborador'}
               </p>
+              <p className="text-[9px] text-zinc-400 font-medium">FleetCheck v1.0</p>
             </div>
           </div>
           
           <div className="flex items-center gap-2 md:gap-4">
             {/* Desktop Navigation */}
-            <div className="hidden md:flex bg-zinc-100 p-1 rounded-xl">
+            <div className="hidden lg:flex bg-zinc-100 p-1 rounded-xl">
               <button 
                 onClick={() => {
                   setEditingChecklistId(null);
@@ -232,7 +233,7 @@ export default function App() {
             <div className="flex items-center gap-2">
               <button 
                 onClick={handleLogout}
-                className="p-2.5 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all hidden md:block"
+                className="p-2.5 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all hidden lg:block"
                 title="Sair"
               >
                 <LogOut className="w-5 h-5" />
@@ -241,7 +242,7 @@ export default function App() {
               {/* Mobile Menu Toggle */}
               <button 
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="p-2.5 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all md:hidden"
+                className="p-2.5 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all lg:hidden"
               >
                 {isMenuOpen ? <X className="w-6 h-6" /> : (
                   <div className="space-y-1.5">
@@ -262,7 +263,7 @@ export default function App() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="md:hidden mt-4 overflow-hidden"
+              className="lg:hidden mt-4 overflow-hidden"
             >
               <div className="flex flex-col gap-2 p-2 bg-zinc-50 rounded-2xl border border-zinc-200">
                 <button 
@@ -334,7 +335,7 @@ export default function App() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 md:px-6 pt-8 md:pt-12">
+      <main className="max-w-6xl mx-auto px-4 md:px-6 pt-6 md:pt-10">
         {isPermissionError && <FirebaseSetupGuide />}
         
         {!isPermissionError && view === 'checklist' && (

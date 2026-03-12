@@ -56,6 +56,16 @@ export default function Login({ onLogin }: LoginProps) {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#154b85] p-6 relative overflow-hidden">
+      {/* Logo AJM */}
+      <div className="absolute top-6 left-6 z-50">
+        <img 
+          src="https://zpublicidade.com.br/wp-content/uploads/2013/07/Marca-AJM-Sem-Slogan.png" 
+          alt="AJM Condomínios" 
+          className="object-contain h-10 md:h-12 w-auto"
+          referrerPolicy="no-referrer"
+        />
+      </div>
+
       {/* Background Image */}
       <div 
         className="absolute inset-0 opacity-20 bg-cover bg-center" 
