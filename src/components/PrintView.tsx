@@ -8,9 +8,17 @@ interface PrintViewProps {
 export default function PrintView({ data }: PrintViewProps) {
   return (
     <div id="print-view" className="hidden print:block p-8 bg-white max-w-[210mm] mx-auto text-sm text-zinc-900">
-      <div className="text-center mb-8 border-b-2 border-zinc-900 pb-4">
-        <h1 className="text-2xl font-bold uppercase tracking-widest">Checklist de Veículo</h1>
-        <p className="text-zinc-500 mt-1">Termo de Responsabilidade e Vistoria</p>
+      <div className="flex justify-between items-start mb-8 border-b-2 border-zinc-900 pb-4">
+        <div className="text-left">
+          <h1 className="text-2xl font-bold uppercase tracking-widest">Checklist de Veículo</h1>
+          <p className="text-zinc-500 mt-1">Termo de Responsabilidade e Vistoria</p>
+        </div>
+        <img 
+          src="https://i.postimg.cc/TYnHNq5z/ajm-Photoroom-(1).png" 
+          alt="AJM Logo" 
+          className="h-12 w-auto object-contain"
+          referrerPolicy="no-referrer"
+        />
       </div>
 
       <div className="space-y-6">

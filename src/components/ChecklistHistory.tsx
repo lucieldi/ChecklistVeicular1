@@ -7,11 +7,14 @@ import {
   AlertCircle,
   Calendar,
   Car,
-  User as UserIcon
+  User as UserIcon,
+  FileDown
 } from 'lucide-react';
 import { ChecklistData } from '../types';
 import { db_firebase } from '../lib/firebase';
 import { collection, getDocs, query, where, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface ChecklistRecord {
   id: string;
@@ -95,6 +98,129 @@ export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
     }
   };
 
+  const downloadIndividualPDF = async (record: ChecklistRecord) => {
+    const doc = new jsPDF();
+    const data = record.data;
+    
+    // Header
+    doc.setFillColor(26, 59, 92);
+    doc.rect(0, 0, 210, 40, 'F');
+    
+    try {
+      const logoUrl = "https://i.postimg.cc/TYnHNq5z/ajm-Photoroom-(1).png";
+      doc.addImage(logoUrl, 'PNG', 14, 10, 40, 16);
+    } catch (e) {
+      console.error("Could not load logo for PDF", e);
+    }
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.text('FleetCheck', 105, 20, { align: 'center' });
+    doc.setFontSize(12);
+    doc.text('Checklist de Veículo - Termo de Responsabilidade', 105, 30, { align: 'center' });
+    
+    doc.setTextColor(0, 0, 0);
+    let y = 50;
+
+    // Section 1: Empresa
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('1. Identificação da Empresa', 14, y);
+    y += 7;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Razão Social: ${data.empresa.razaoSocial || '---'}`, 14, y);
+    doc.text(`CNPJ: ${data.empresa.cnpj || '---'}`, 105, y);
+    y += 6;
+    doc.text(`Razão Social 2: ${data.empresa.razaoSocial2 || '---'}`, 14, y);
+    doc.text(`CNPJ 2: ${data.empresa.cnpj2 || '---'}`, 105, y);
+    y += 10;
+
+    // Section 2: Colaborador
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('2. Identificação do Colaborador', 14, y);
+    y += 7;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Nome: ${data.colaborador.nome || '---'}`, 14, y);
+    y += 6;
+    doc.text(`CPF: ${data.colaborador.cpf || '---'}`, 14, y);
+    doc.text(`Cargo: ${data.colaborador.cargo || '---'}`, 105, y);
+    y += 6;
+    doc.text(`CNH: ${data.colaborador.cnh || '---'}`, 14, y);
+    doc.text(`Validade CNH: ${data.colaborador.validadeCnh || '---'}`, 105, y);
+    y += 10;
+
+    // Section 3: Veículo
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('3. Identificação do Veículo', 14, y);
+    y += 7;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Marca/Modelo: ${data.veiculo.marcaModelo || '---'}`, 14, y);
+    doc.text(`Placa: ${data.veiculo.placa || '---'}`, 105, y);
+    y += 6;
+    doc.text(`Cor: ${data.veiculo.cor || '---'}`, 14, y);
+    doc.text(`Ano/Modelo: ${data.veiculo.anoModelo || '---'}`, 105, y);
+    y += 6;
+    doc.text(`KM Entrega: ${data.veiculo.kmEntrega || '---'}`, 14, y);
+    doc.text(`KM Devolução: ${data.veiculo.kmDevolucao || '---'}`, 105, y);
+    y += 6;
+    doc.text(`Data Entrega: ${data.veiculo.dataEntrega} ${data.veiculo.horaEntrega}`, 14, y);
+    doc.text(`Data Devolução: ${data.veiculo.dataDevolucao} ${data.veiculo.horaDevolucao}`, 105, y);
+    y += 15;
+
+    // Section 4: Condições
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('4. Condições do Veículo', 14, y);
+    y += 7;
+    
+    const condRows = [
+      ['Lataria', data.condicoesEntrega.externa.lataria ? 'OK' : 'N/A', 'Bancos', data.condicoesEntrega.interna.bancos ? 'OK' : 'N/A'],
+      ['Pintura', data.condicoesEntrega.externa.pintura ? 'OK' : 'N/A', 'Painel', data.condicoesEntrega.interna.painel ? 'OK' : 'N/A'],
+      ['Para-choques', data.condicoesEntrega.externa.parachoques ? 'OK' : 'N/A', 'Ar Cond.', data.condicoesEntrega.interna.arCondicionado ? 'OK' : 'N/A'],
+      ['Vidros', data.condicoesEntrega.externa.vidros ? 'OK' : 'N/A', 'Motor', data.condicoesEntrega.mecanica.motor ? 'OK' : 'N/A'],
+      ['Pneus', data.condicoesEntrega.externa.pneus ? 'OK' : 'N/A', 'Freios', data.condicoesEntrega.mecanica.freios ? 'OK' : 'N/A']
+    ];
+
+    autoTable(doc, {
+      body: condRows,
+      startY: y,
+      theme: 'plain',
+      styles: { fontSize: 9 },
+      columnStyles: { 0: { fontStyle: 'bold' }, 2: { fontStyle: 'bold' } }
+    });
+    
+    y = (doc as any).lastAutoTable.finalY + 10;
+
+    // Termo de Responsabilidade
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Termo de Responsabilidade', 14, y);
+    y += 6;
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    const termo = `Eu, ${data.colaborador.nome}, declaro que recebi o veículo nas condições descritas neste checklist, comprometendo-me a utilizá-lo exclusivamente para fins autorizados, cumprir a legislação de trânsito vigente, zelar pela conservação do bem, comunicar imediatamente qualquer sinistro ou irregularidade e assumir responsabilidade por multas decorrentes de infrações cometidas durante o período de utilização por mim, conforme o termo de responsabilidade assinado com a empresa ${data.empresa.razaoSocial}.`;
+    const splitTermo = doc.splitTextToSize(termo, 180);
+    doc.text(splitTermo, 14, y);
+    
+    y += (splitTermo.length * 4) + 20;
+
+    // Signatures
+    doc.line(14, y, 90, y);
+    doc.line(120, y, 196, y);
+    y += 5;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Assinatura do Colaborador', 52, y, { align: 'center' });
+    doc.text('Assinatura do Responsável', 158, y, { align: 'center' });
+
+    doc.save(`checklist_${record.id.substring(0, 8)}.pdf`);
+  };
+
   const userStr = localStorage.getItem('fleetcheck_user');
   const currentUser = userStr ? JSON.parse(userStr) : null;
   const isAdmin = currentUser?.role === 'admin';
@@ -172,6 +298,14 @@ export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
               </div>
 
               <div className="flex items-center gap-2 pt-4 md:pt-0 border-t md:border-t-0 border-zinc-100">
+                <button 
+                  onClick={() => downloadIndividualPDF(record)}
+                  className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 rounded-xl font-bold transition-all"
+                  title="Baixar PDF"
+                >
+                  <FileDown className="w-4 h-4" />
+                  PDF
+                </button>
                 <button 
                   onClick={() => onEdit(record.id, record.data)}
                   className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-zinc-100 text-zinc-700 hover:bg-zinc-200 hover:text-zinc-900 rounded-xl font-bold transition-all"
