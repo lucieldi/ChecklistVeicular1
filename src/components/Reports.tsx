@@ -102,8 +102,11 @@ export default function Reports() {
       'CPF',
       'Veículo',
       'Placa',
+      'Destino',
       'KM Entrega',
-      'KM Devolução'
+      'KM Devolução',
+      'Combustível',
+      'Condições Devolução'
     ];
 
     const csvContent = [
@@ -120,8 +123,11 @@ export default function Reports() {
           `"${record.data.colaborador.cpf}"`,
           `"${record.data.veiculo.marcaModelo}"`,
           `"${record.data.veiculo.placa}"`,
+          `"${record.data.veiculo.destino || ''}"`,
           `"${record.data.veiculo.kmEntrega}"`,
-          `"${record.data.veiculo.kmDevolucao}"`
+          `"${record.data.veiculo.kmDevolucao}"`,
+          `"${record.data.combustivelEntrega || ''}"`,
+          `"${record.data.condicoesDevolucao || ''}"`
         ].join(',');
       })
     ].join('\n');
@@ -154,7 +160,7 @@ export default function Reports() {
     doc.setTextColor(100);
     doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 50, 30);
     
-    const tableColumn = ["ID", "Data", "Criado por", "Empresa", "Colaborador", "Veículo", "Placa"];
+    const tableColumn = ["ID", "Data", "Criado por", "Empresa", "Colaborador", "Veículo", "Placa", "Destino"];
     const tableRows = filteredChecklists.map(record => [
       record.id.substring(0, 8),
       new Date(record.created_at).toLocaleDateString('pt-BR'),
@@ -162,7 +168,8 @@ export default function Reports() {
       record.data.empresa.razaoSocial,
       record.data.colaborador.nome,
       record.data.veiculo.marcaModelo,
-      record.data.veiculo.placa
+      record.data.veiculo.placa,
+      record.data.veiculo.destino || ''
     ]);
 
     autoTable(doc, {
@@ -253,12 +260,14 @@ export default function Reports() {
     y += 6;
     doc.text(`Data Entrega: ${data.veiculo.dataEntrega} ${data.veiculo.horaEntrega}`, 14, y);
     doc.text(`Data Devolução: ${data.veiculo.dataDevolucao} ${data.veiculo.horaDevolucao}`, 105, y);
+    y += 6;
+    doc.text(`Destino/Rota: ${data.veiculo.destino || '---'}`, 14, y);
     y += 15;
 
     // Section 4: Condições
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text('4. Condições do Veículo', 14, y);
+    doc.text('4. Condições do Veículo (Inicial)', 14, y);
     y += 7;
     
     const condRows = [
@@ -278,6 +287,42 @@ export default function Reports() {
     });
     
     y = (doc as any).lastAutoTable.finalY + 10;
+
+    // Section 5: Acessórios e Combustível
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('5. Acessórios e Combustível', 14, y);
+    y += 7;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Combustível: ${data.combustivelEntrega || '---'}`, 14, y);
+    y += 6;
+    
+    const accList = [];
+    if (data.acessorios.documento) accList.push('Doc');
+    if (data.acessorios.manual) accList.push('Manual');
+    if (data.acessorios.chavePrincipal) accList.push('Chave');
+    if (data.acessorios.triangulo) accList.push('Triângulo');
+    if (data.acessorios.macaco) accList.push('Macaco');
+    if (data.acessorios.chaveRoda) accList.push('Chave Roda');
+    if (data.acessorios.estepe) accList.push('Estepe');
+    if (data.acessorios.cartaoCombustivel) accList.push('Cartão Comb.');
+    if (data.acessorios.controlePortao) accList.push('Controle Portão');
+    
+    doc.text(`Acessórios: ${accList.join(', ') || 'Nenhum'}`, 14, y);
+    y += 10;
+
+    // Section 6: Devolução
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('6. Condições na Devolução', 14, y);
+    y += 7;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const devText = data.condicoesDevolucao || 'Nenhuma avaria relatada.';
+    const splitDev = doc.splitTextToSize(devText, 180);
+    doc.text(splitDev, 14, y);
+    y += (splitDev.length * 5) + 10;
 
     // Termo de Responsabilidade
     doc.setFontSize(12);
@@ -388,13 +433,14 @@ export default function Reports() {
                 <th className="px-6 py-4 font-bold uppercase tracking-wider text-xs">Colaborador</th>
                 <th className="px-6 py-4 font-bold uppercase tracking-wider text-xs">Veículo</th>
                 <th className="px-6 py-4 font-bold uppercase tracking-wider text-xs">Placa</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider text-xs">Destino</th>
                 <th className="px-6 py-4 font-bold uppercase tracking-wider text-xs text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
               {filteredChecklists.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdmin ? 8 : 7} className="px-6 py-12 text-center text-zinc-500">
+                  <td colSpan={9} className="px-6 py-12 text-center text-zinc-500">
                     Nenhum registro encontrado.
                   </td>
                 </tr>
@@ -419,6 +465,9 @@ export default function Reports() {
                     </td>
                     <td className="px-6 py-4 text-zinc-600">
                       {record.data.veiculo.placa || '-'}
+                    </td>
+                    <td className="px-6 py-4 text-zinc-600 truncate max-w-[150px]" title={record.data.veiculo.destino}>
+                      {record.data.veiculo.destino || '-'}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">

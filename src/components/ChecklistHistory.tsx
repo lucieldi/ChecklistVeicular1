@@ -171,12 +171,14 @@ export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
     y += 6;
     doc.text(`Data Entrega: ${data.veiculo.dataEntrega} ${data.veiculo.horaEntrega}`, 14, y);
     doc.text(`Data Devolução: ${data.veiculo.dataDevolucao} ${data.veiculo.horaDevolucao}`, 105, y);
+    y += 6;
+    doc.text(`Destino/Rota: ${data.veiculo.destino || '---'}`, 14, y);
     y += 15;
 
     // Section 4: Condições
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text('4. Condições do Veículo', 14, y);
+    doc.text('4. Condições do Veículo (Inicial)', 14, y);
     y += 7;
     
     const condRows = [
@@ -196,6 +198,42 @@ export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
     });
     
     y = (doc as any).lastAutoTable.finalY + 10;
+
+    // Section 5: Acessórios e Combustível
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('5. Acessórios e Combustível', 14, y);
+    y += 7;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Combustível: ${data.combustivelEntrega || '---'}`, 14, y);
+    y += 6;
+    
+    const accList = [];
+    if (data.acessorios.documento) accList.push('Doc');
+    if (data.acessorios.manual) accList.push('Manual');
+    if (data.acessorios.chavePrincipal) accList.push('Chave');
+    if (data.acessorios.triangulo) accList.push('Triângulo');
+    if (data.acessorios.macaco) accList.push('Macaco');
+    if (data.acessorios.chaveRoda) accList.push('Chave Roda');
+    if (data.acessorios.estepe) accList.push('Estepe');
+    if (data.acessorios.cartaoCombustivel) accList.push('Cartão Comb.');
+    if (data.acessorios.controlePortao) accList.push('Controle Portão');
+    
+    doc.text(`Acessórios: ${accList.join(', ') || 'Nenhum'}`, 14, y);
+    y += 10;
+
+    // Section 6: Devolução
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('6. Condições na Devolução', 14, y);
+    y += 7;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const devText = data.condicoesDevolucao || 'Nenhuma avaria relatada.';
+    const splitDev = doc.splitTextToSize(devText, 180);
+    doc.text(splitDev, 14, y);
+    y += (splitDev.length * 5) + 10;
 
     // Termo de Responsabilidade
     doc.setFontSize(12);
@@ -286,6 +324,7 @@ export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
                       <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Veículo</p>
                       <p className="font-semibold text-zinc-900">{record.data.veiculo.marcaModelo || 'Não informado'}</p>
                       <p className="text-sm text-zinc-500">Placa: {record.data.veiculo.placa || 'N/A'}</p>
+                      <p className="text-xs text-zinc-400 mt-1"><span className="font-bold">Destino:</span> {record.data.veiculo.destino || '-'}</p>
                     </div>
                   </div>
                   
@@ -297,9 +336,17 @@ export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
                       <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Colaborador</p>
                       <p className="font-semibold text-zinc-900">{record.data.colaborador.nome || 'Não informado'}</p>
                       <p className="text-sm text-zinc-500">{record.data.empresa.razaoSocial || 'Empresa não informada'}</p>
+                      <p className="text-xs text-zinc-400 mt-1"><span className="font-bold">Combustível:</span> {record.data.combustivelEntrega || '-'}</p>
                     </div>
                   </div>
                 </div>
+
+                {record.data.condicoesDevolucao && (
+                  <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-100">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Condições na Devolução</p>
+                    <p className="text-xs text-zinc-600 italic">{record.data.condicoesDevolucao}</p>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-2 pt-4 md:pt-0 border-t md:border-t-0 border-zinc-100">
