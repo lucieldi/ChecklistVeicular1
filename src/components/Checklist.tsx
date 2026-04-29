@@ -21,8 +21,9 @@ import { ChecklistData } from '../types';
 import PrintView from './PrintView';
 import SignaturePad from './SignaturePad';
 import html2pdf from 'html2pdf.js';
-import { db_firebase } from '../lib/firebase';
+import { db_firebase, storage } from '../lib/firebase';
 import { collection, addDoc, updateDoc, doc, getDocs, query } from 'firebase/firestore';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 
 const defaultInitialData: ChecklistData = {
   empresa: { razaoSocial: '', razaoSocial2: '', cnpj: '', cnpj2: '', obs: '' },
@@ -74,9 +75,11 @@ interface ChecklistProps {
 }
 
 export default function Checklist({ editingId, initialData, onFinish }: ChecklistProps) {
+  const [isSaving, setIsSaving] = useState(false);
   const [data, setData] = useState<ChecklistData>(initialData || defaultInitialData);
   const [step, setStep] = useState(1);
   const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+  const [showValidationErrors, setShowValidationErrors] = useState(false);
   
   const [empresas, setEmpresas] = useState<any[]>([]);
   const [colaboradores, setColaboradores] = useState<any[]>([]);
@@ -117,6 +120,17 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
             ) as any;
             
             if (match) {
+              // Helper to convert DD/MM/YYYY to YYYY-MM-DD for input[type="date"]
+              const formatDate = (dateStr: string) => {
+                if (!dateStr) return '';
+                if (dateStr.includes('-')) return dateStr; // Already YYYY-MM-DD
+                const parts = dateStr.split('/');
+                if (parts.length === 3) {
+                  return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                }
+                return dateStr;
+              };
+
               setData(prev => ({
                 ...prev,
                 colaborador: {
@@ -125,7 +139,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   cpf: match.cpf || '',
                   cargo: match.cargo || '',
                   cnh: match.cnh || '',
-                  validadeCnh: match.validadeCnh || ''
+                  validadeCnh: formatDate(match.validadeCnh || '')
                 }
               }));
             }
@@ -210,13 +224,43 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
     if (!files) return;
 
     Array.from(files).forEach(file => {
+      // Compress image before adding to state
       const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        setData(prev => ({
-          ...prev,
-          fotos: [...(prev.fotos || []), base64String]
-        }));
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // Max dimension 800px to keep size low
+          const MAX_SIZE = 800;
+          if (width > height) {
+            if (width > MAX_SIZE) {
+              height *= MAX_SIZE / width;
+              width = MAX_SIZE;
+            }
+          } else {
+            if (height > MAX_SIZE) {
+              width *= MAX_SIZE / height;
+              height = MAX_SIZE;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          // Quality 0.6 is a good balance for documentation
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.6);
+          
+          setData(prev => ({
+            ...prev,
+            fotos: [...(prev.fotos || []), compressedDataUrl]
+          }));
+        };
+        img.src = event.target?.result as string;
       };
       reader.readAsDataURL(file);
     });
@@ -261,25 +305,26 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
     const errors: string[] = [];
 
     if (stepToValidate === 1) {
-      if (!data.empresa.razaoSocial) errors.push("Razão Social");
-      if (!data.empresa.cnpj) errors.push("CNPJ");
+      if (!data.empresa.razaoSocial) errors.push("Razão Social (Empresa)");
+      if (!data.empresa.cnpj) errors.push("CNPJ (Empresa)");
       if (!data.colaborador.nome) errors.push("Nome do Colaborador");
-      if (!data.colaborador.cpf) errors.push("CPF");
-      if (!data.colaborador.cargo) errors.push("Cargo");
-      if (!data.colaborador.cnh) errors.push("CNH");
+      if (!data.colaborador.cpf) errors.push("CPF do Colaborador");
+      if (!data.colaborador.cargo) errors.push("Cargo do Colaborador");
+      if (!data.colaborador.cnh) errors.push("CNH do Colaborador");
+      // Some collaborators might have invalid date format in DB, we should be careful but still validate if it exists
       if (!data.colaborador.validadeCnh) errors.push("Validade CNH");
     }
 
     if (stepToValidate === 2) {
-      if (!data.veiculo.marcaModelo) errors.push("Marca/Modelo");
-      if (!data.veiculo.placa) errors.push("Placa");
-      if (!data.veiculo.renavam) errors.push("Renavam");
-      if (!data.veiculo.cor) errors.push("Cor");
-      if (!data.veiculo.anoModelo) errors.push("Ano/Modelo");
+      if (!data.veiculo.marcaModelo) errors.push("Marca/Modelo do Veículo");
+      if (!data.veiculo.placa) errors.push("Placa do Veículo");
+      if (!data.veiculo.renavam) errors.push("Renavam do Veículo");
+      if (!data.veiculo.cor) errors.push("Cor do Veículo");
+      if (!data.veiculo.anoModelo) errors.push("Ano/Modelo do Veículo");
       if (!data.veiculo.kmEntrega) errors.push("KM Inicial");
       if (!data.veiculo.dataEntrega) errors.push("Data Inicial");
       if (!data.veiculo.horaEntrega) errors.push("Hora Inicial");
-      if (!data.veiculo.destino) errors.push("Destino");
+      if (!data.veiculo.destino) errors.push("Destino/Rota");
     }
 
     if (stepToValidate === 4) {
@@ -287,15 +332,16 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
     }
 
     if (stepToValidate === 5) {
-      if (!data.condicoesDevolucao.trim()) errors.push("Condições na Devolução");
+      // Making this optional as requested by user's frustration with blocked progress
+      // Users might not have specific notes for every return
     }
 
     if (stepToValidate === 6) {
-      if (!data.assinaturaColaborador) errors.push("Assinatura do Colaborador");
-      if (!data.assinaturaResponsavel) errors.push("Assinatura do Responsável");
+      // Signatures are no longer mandatory as they are being removed from UI
     }
 
     if (errors.length > 0) {
+      setShowValidationErrors(true);
       setSaveStatus({ 
         type: 'error', 
         message: `Preencha os campos obrigatórios: ${errors.join(', ')}` 
@@ -303,6 +349,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
       setTimeout(() => setSaveStatus(null), 4000);
       return false;
     }
+    setShowValidationErrors(false);
     return true;
   };
 
@@ -311,41 +358,94 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
     for (let i = 1; i <= step; i++) {
       if (!validateStep(i)) return;
     }
-    if (step === 6) {
-      if (!data.assinaturaColaborador || !data.assinaturaResponsavel) {
-        setSaveStatus({ type: 'error', message: 'Assinaturas são obrigatórias para finalizar.' });
-        setTimeout(() => setSaveStatus(null), 3000);
-        return;
-      }
-    }
+    
+    setIsSaving(true);
+    setSaveStatus({ type: 'success', message: 'Processando fotos e salvando...' });
 
     try {
       const userStr = localStorage.getItem('fleetcheck_user');
       const user = userStr ? JSON.parse(userStr) : null;
       
-      const checklistData = {
-        ...data,
-        userId: user?.id,
-        createdAt: new Date().toISOString()
-      };
+      if (!user?.id) {
+        throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
+      }
 
-      if (editingId) {
-        await updateDoc(doc(db_firebase, 'checklists', String(editingId)), checklistData);
-      } else {
-        await addDoc(collection(db_firebase, 'checklists'), checklistData);
+      // Upload photos to Firebase Storage if they are base64
+      const uploadedFotosUrls: string[] = [];
+      const currentFotos = data.fotos || [];
+
+      for (let i = 0; i < currentFotos.length; i++) {
+        const foto = currentFotos[i];
+        if (foto.startsWith('data:image')) {
+          // New photo in base64, needs upload
+          const fileName = `checklists/${user.id}/${Date.now()}-${i}.jpg`;
+          const storageRef = ref(storage, fileName);
+          
+          try {
+            await uploadString(storageRef, foto, 'data_url');
+            const downloadUrl = await getDownloadURL(storageRef);
+            uploadedFotosUrls.push(downloadUrl);
+          } catch (uploadError: any) {
+            console.error('Error uploading photo:', uploadError);
+            throw new Error(`Erro ao enviar foto ${i + 1}: ${uploadError.message}`);
+          }
+        } else {
+          // Already a URL
+          uploadedFotosUrls.push(foto);
+        }
       }
       
-      setSaveStatus({ type: 'success', message: 'Checklist salvo no Firebase!' });
-      setTimeout(() => {
-        setSaveStatus(null);
-        setData(defaultInitialData);
-        setStep(1);
-        if (onFinish) onFinish();
-      }, 2000);
-    } catch (error) {
-      console.error('Error saving checklist to Firebase:', error);
-      setSaveStatus({ type: 'error', message: 'Erro ao salvar no Firebase. Verifique as regras.' });
-      setTimeout(() => setSaveStatus(null), 3000);
+      const checklistData = {
+        ...data,
+        fotos: uploadedFotosUrls,
+        userId: user.id,
+        updatedAt: new Date().toISOString(),
+        createdAt: data.createdAt || new Date().toISOString()
+      };
+
+      try {
+        if (editingId) {
+          await updateDoc(doc(db_firebase, 'checklists', String(editingId)), checklistData);
+        } else {
+          await addDoc(collection(db_firebase, 'checklists'), checklistData);
+        }
+        
+        setSaveStatus({ type: 'success', message: 'Checklist salvo com sucesso!' });
+        setTimeout(() => {
+          setSaveStatus(null);
+          setData(defaultInitialData);
+          setStep(1);
+          if (onFinish) onFinish();
+        }, 2000);
+      } catch (error: any) {
+        // Detailed Firestore Error Handling as per guidelines
+        const errInfo = {
+          error: error instanceof Error ? error.message : String(error),
+          operationType: editingId ? 'update' : 'create',
+          path: 'checklists',
+          authInfo: {
+            userId: user.id,
+            role: user.role
+          }
+        };
+        console.error('Firestore Error Details:', JSON.stringify(errInfo));
+        
+        if (error.code === 'permission-denied') {
+          setSaveStatus({ 
+            type: 'error', 
+            message: 'Erro de Permissão: Verifique se suas regras do Firestore permitem escrita para usuários comuns.' 
+          });
+        } else {
+          setSaveStatus({ type: 'error', message: `Erro ao salvar: ${error.message || 'Erro desconhecido'}` });
+        }
+        setTimeout(() => setSaveStatus(null), 5000);
+      }
+    } catch (error: any) {
+      console.error('Save setup error:', error);
+      setSaveStatus({ type: 'error', message: error.message || 'Erro ao processar salvamento.' });
+      setTimeout(() => setSaveStatus(null), 5000);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -359,41 +459,77 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
             className="space-y-8"
           >
             <section className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-zinc-100 rounded-lg">
-                  <Building2 className="w-5 h-5 text-zinc-600" />
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-zinc-100 rounded-lg">
+                    <Building2 className="w-5 h-5 text-zinc-600" />
+                  </div>
+                  <h2 className="text-xl font-semibold text-zinc-900">1. Identificação da Empresa</h2>
                 </div>
-                <h2 className="text-xl font-semibold text-zinc-900">1. Identificação da Empresa</h2>
+                {!editingId && (
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('Deseja realmente limpar todo o checklist?')) {
+                        setData(defaultInitialData);
+                        setStep(1);
+                      }
+                    }}
+                    className="text-[10px] font-bold text-red-500 hover:text-red-700 uppercase tracking-widest transition-colors flex items-center gap-1"
+                  >
+                    <X className="w-3 h-3" />
+                    Limpar Tudo
+                  </button>
+                )}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">RAZÃO SOCIAL <span className="text-red-500">*</span></label>
-                  <select 
-                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
-                    value={data.empresa.razaoSocial}
-                    onChange={e => {
-                      const val = e.target.value;
-                      const empresa = empresas.find(emp => emp.razaoSocial === val);
-                      if (empresa) {
-                        updateField('empresa', 'razaoSocial', empresa.razaoSocial);
-                        updateField('empresa', 'cnpj', empresa.cnpj || '');
-                      } else {
-                        updateField('empresa', 'razaoSocial', val);
-                        updateField('empresa', 'cnpj', '');
-                      }
-                    }}
-                  >
-                    <option value="">Selecione uma empresa...</option>
+                  <div className="relative">
+                    <input 
+                      list="empresas-list"
+                      className={`w-full px-4 py-2.5 bg-zinc-50 border rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all pr-10 ${
+                        showValidationErrors && !data.empresa.razaoSocial ? 'border-red-500' : 'border-zinc-200'
+                      }`}
+                      value={data.empresa.razaoSocial}
+                      onChange={e => {
+                        const val = e.target.value;
+                        const empresa = empresas.find(emp => emp.razaoSocial === val);
+                        if (empresa) {
+                          updateField('empresa', 'razaoSocial', empresa.razaoSocial);
+                          updateField('empresa', 'cnpj', empresa.cnpj || '');
+                        } else {
+                          updateField('empresa', 'razaoSocial', val);
+                        }
+                      }}
+                      placeholder="Digite ou selecione a empresa..."
+                    />
+                    {data.empresa.razaoSocial && (
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          updateField('empresa', 'razaoSocial', '');
+                          updateField('empresa', 'cnpj', '');
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 p-1"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  <datalist id="empresas-list">
                     {empresas.map(emp => (
                       <option key={emp.id} value={emp.razaoSocial}>{emp.razaoSocial}</option>
                     ))}
-                  </select>
+                  </datalist>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">CNPJ <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
-                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
+                    className={`w-full px-4 py-2.5 bg-zinc-50 border rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all ${
+                      showValidationErrors && !data.empresa.cnpj ? 'border-red-500' : 'border-zinc-200'
+                    }`}
                     value={data.empresa.cnpj}
                     onChange={e => updateField('empresa', 'cnpj', e.target.value)}
                   />
@@ -401,7 +537,8 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">RAZÃO SOCIAL 2</label>
-                  <select 
+                  <input 
+                    list="empresas-list-2"
                     className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
                     value={data.empresa.razaoSocial2}
                     onChange={e => {
@@ -412,15 +549,15 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                         updateField('empresa', 'cnpj2', empresa.cnpj || '');
                       } else {
                         updateField('empresa', 'razaoSocial2', val);
-                        updateField('empresa', 'cnpj2', '');
                       }
                     }}
-                  >
-                    <option value="">Selecione uma empresa...</option>
+                    placeholder="Digite ou selecione a empresa..."
+                  />
+                  <datalist id="empresas-list-2">
                     {empresas.map(emp => (
                       <option key={emp.id} value={emp.razaoSocial}>{emp.razaoSocial}</option>
                     ))}
-                  </select>
+                  </datalist>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">CNPJ 2</label>
@@ -454,19 +591,69 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5 md:col-span-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">NOME COMPLETO <span className="text-red-500">*</span></label>
-                  <input 
-                    type="text"
-                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
-                    value={data.colaborador.nome}
-                    onChange={e => updateField('colaborador', 'nome', e.target.value)}
-                    placeholder="Nome do colaborador"
-                  />
+                  <div className="relative">
+                    <input 
+                      list="colaboradores-list"
+                      className={`w-full px-4 py-2.5 bg-zinc-50 border rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all pr-10 ${
+                        showValidationErrors && !data.colaborador.nome ? 'border-red-500' : 'border-zinc-200'
+                      }`}
+                      value={data.colaborador.nome}
+                      onChange={e => {
+                        const val = e.target.value;
+                        const collab = colaboradores.find(c => c.nome === val);
+                        if (collab) {
+                          setData(prev => ({
+                            ...prev,
+                            colaborador: {
+                              id: collab.id,
+                              nome: collab.nome || '',
+                              cpf: collab.cpf || '',
+                              cargo: collab.cargo || '',
+                              cnh: collab.cnh || '',
+                              validadeCnh: collab.validadeCnh || ''
+                            }
+                          }));
+                        } else {
+                          updateField('colaborador', 'nome', val);
+                        }
+                      }}
+                      placeholder="Nome do colaborador"
+                    />
+                    {data.colaborador.nome && (
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setData(prev => ({
+                            ...prev,
+                            colaborador: {
+                              id: undefined,
+                              nome: '',
+                              cpf: '',
+                              cargo: '',
+                              cnh: '',
+                              validadeCnh: ''
+                            }
+                          }));
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 p-1"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  <datalist id="colaboradores-list">
+                    {colaboradores.map(c => (
+                      <option key={c.id} value={c.nome}>{c.cargo} - {c.cpf}</option>
+                    ))}
+                  </datalist>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">CPF <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
-                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
+                    className={`w-full px-4 py-2.5 bg-zinc-50 border rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all ${
+                      showValidationErrors && !data.colaborador.cpf ? 'border-red-500' : 'border-zinc-200'
+                    }`}
                     value={data.colaborador.cpf}
                     onChange={e => updateField('colaborador', 'cpf', e.target.value)}
                   />
@@ -475,7 +662,9 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">CARGO <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
-                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
+                    className={`w-full px-4 py-2.5 bg-zinc-50 border rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all ${
+                      showValidationErrors && !data.colaborador.cargo ? 'border-red-500' : 'border-zinc-200'
+                    }`}
                     value={data.colaborador.cargo}
                     onChange={e => updateField('colaborador', 'cargo', e.target.value)}
                   />
@@ -484,7 +673,9 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">CNH Nº <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
-                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
+                    className={`w-full px-4 py-2.5 bg-zinc-50 border rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all ${
+                      showValidationErrors && !data.colaborador.cnh ? 'border-red-500' : 'border-zinc-200'
+                    }`}
                     value={data.colaborador.cnh}
                     onChange={e => updateField('colaborador', 'cnh', e.target.value)}
                   />
@@ -493,7 +684,9 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">VALIDADE <span className="text-red-500">*</span></label>
                   <input 
                     type="date" 
-                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
+                    className={`w-full px-4 py-2.5 bg-zinc-50 border rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all ${
+                      showValidationErrors && !data.colaborador.validadeCnh ? 'border-red-500' : 'border-zinc-200'
+                    }`}
                     value={data.colaborador.validadeCnh}
                     onChange={e => updateField('colaborador', 'validadeCnh', e.target.value)}
                   />
@@ -519,42 +712,61 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-1.5 lg:col-span-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">MARCA/MODELO <span className="text-red-500">*</span></label>
-                  <select 
-                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
-                    value={data.veiculo.id || data.veiculo.marcaModelo}
-                    onChange={e => {
-                      const val = e.target.value;
-                      const veiculo = veiculos.find(v => v.id.toString() === val || v.marcaModelo === val);
-                      if (veiculo) {
-                        updateField('veiculo', 'id', veiculo.id);
-                        updateField('veiculo', 'marcaModelo', veiculo.marcaModelo);
-                        updateField('veiculo', 'placa', veiculo.placa || '');
-                        updateField('veiculo', 'renavam', veiculo.renavam || '');
-                        updateField('veiculo', 'cor', veiculo.cor || '');
-                        updateField('veiculo', 'anoModelo', veiculo.anoModelo || '');
-                      } else {
-                        updateField('veiculo', 'id', undefined);
-                        updateField('veiculo', 'marcaModelo', val);
-                        updateField('veiculo', 'placa', '');
-                        updateField('veiculo', 'renavam', '');
-                        updateField('veiculo', 'cor', '');
-                        updateField('veiculo', 'anoModelo', '');
-                      }
-                    }}
-                  >
-                    <option value="">Selecione um veículo...</option>
+                  <div className="relative">
+                    <input 
+                      list="veiculos-list"
+                      className={`w-full px-4 py-2.5 bg-zinc-50 border rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all pr-10 ${
+                        showValidationErrors && !data.veiculo.marcaModelo ? 'border-red-500' : 'border-zinc-200'
+                      }`}
+                      value={data.veiculo.marcaModelo}
+                      onChange={e => {
+                        const val = e.target.value;
+                        const veiculo = veiculos.find(v => v.id.toString() === val || v.marcaModelo === val);
+                        if (veiculo) {
+                          updateField('veiculo', 'id', veiculo.id);
+                          updateField('veiculo', 'marcaModelo', veiculo.marcaModelo);
+                          updateField('veiculo', 'placa', veiculo.placa || '');
+                          updateField('veiculo', 'renavam', veiculo.renavam || '');
+                          updateField('veiculo', 'cor', veiculo.cor || '');
+                          updateField('veiculo', 'anoModelo', veiculo.anoModelo || '');
+                        } else {
+                          updateField('veiculo', 'id', undefined);
+                          updateField('veiculo', 'marcaModelo', val);
+                        }
+                      }}
+                      placeholder="Digite ou selecione o veículo..."
+                    />
+                    {data.veiculo.marcaModelo && (
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          updateField('veiculo', 'id', undefined);
+                          updateField('veiculo', 'marcaModelo', '');
+                          updateField('veiculo', 'placa', '');
+                          updateField('veiculo', 'renavam', '');
+                          updateField('veiculo', 'cor', '');
+                          updateField('veiculo', 'anoModelo', '');
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 p-1"
+                        title="Limpar seleção"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  <datalist id="veiculos-list">
                     {veiculos.map(v => (
-                      <option key={v.id} value={v.id}>
-                        {v.marcaModelo}
-                      </option>
+                      <option key={v.id} value={v.marcaModelo}>{v.placa} - {v.cor} - {v.anoModelo}</option>
                     ))}
-                  </select>
+                  </datalist>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">PLACA <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
-                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
+                    className={`w-full px-4 py-2.5 bg-zinc-50 border rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all ${
+                      showValidationErrors && !data.veiculo.placa ? 'border-red-500' : 'border-zinc-200'
+                    }`}
                     value={data.veiculo.placa}
                     onChange={e => updateField('veiculo', 'placa', e.target.value)}
                   />
@@ -563,7 +775,9 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">RENAVAM <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
-                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
+                    className={`w-full px-4 py-2.5 bg-zinc-50 border rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all ${
+                      showValidationErrors && !data.veiculo.renavam ? 'border-red-500' : 'border-zinc-200'
+                    }`}
                     value={data.veiculo.renavam}
                     onChange={e => updateField('veiculo', 'renavam', e.target.value)}
                   />
@@ -572,7 +786,9 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">COR <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
-                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
+                    className={`w-full px-4 py-2.5 bg-zinc-50 border rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all ${
+                      showValidationErrors && !data.veiculo.cor ? 'border-red-500' : 'border-zinc-200'
+                    }`}
                     value={data.veiculo.cor}
                     onChange={e => updateField('veiculo', 'cor', e.target.value)}
                   />
@@ -581,7 +797,9 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">ANO/MODELO <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
-                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
+                    className={`w-full px-4 py-2.5 bg-zinc-50 border rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all ${
+                      showValidationErrors && !data.veiculo.anoModelo ? 'border-red-500' : 'border-zinc-200'
+                    }`}
                     value={data.veiculo.anoModelo}
                     onChange={e => updateField('veiculo', 'anoModelo', e.target.value)}
                   />
@@ -593,16 +811,22 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                     <div className="grid grid-cols-1 sm:grid-cols-1 gap-3">
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold uppercase text-zinc-400">KM <span className="text-red-500">*</span></label>
-                        <input type="text" className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-sm" value={data.veiculo.kmEntrega} onChange={e => updateField('veiculo', 'kmEntrega', e.target.value)} />
+                        <input type="text" className={`w-full px-3 py-2 bg-white border rounded-lg text-sm ${
+                          showValidationErrors && !data.veiculo.kmEntrega ? 'border-red-500' : 'border-zinc-200'
+                        }`} value={data.veiculo.kmEntrega} onChange={e => updateField('veiculo', 'kmEntrega', e.target.value)} />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1">
                           <label className="text-[10px] font-bold uppercase text-zinc-400">Data <span className="text-red-500">*</span></label>
-                          <input type="date" className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-sm" value={data.veiculo.dataEntrega} onChange={e => updateField('veiculo', 'dataEntrega', e.target.value)} />
+                          <input type="date" className={`w-full px-3 py-2 bg-white border rounded-lg text-sm ${
+                            showValidationErrors && !data.veiculo.dataEntrega ? 'border-red-500' : 'border-zinc-200'
+                          }`} value={data.veiculo.dataEntrega} onChange={e => updateField('veiculo', 'dataEntrega', e.target.value)} />
                         </div>
                         <div className="space-y-1">
                           <label className="text-[10px] font-bold uppercase text-zinc-400">Hora <span className="text-red-500">*</span></label>
-                          <input type="time" className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-lg text-sm" value={data.veiculo.horaEntrega} onChange={e => updateField('veiculo', 'horaEntrega', e.target.value)} />
+                          <input type="time" className={`w-full px-3 py-2 bg-white border rounded-lg text-sm ${
+                            showValidationErrors && !data.veiculo.horaEntrega ? 'border-red-500' : 'border-zinc-200'
+                          }`} value={data.veiculo.horaEntrega} onChange={e => updateField('veiculo', 'horaEntrega', e.target.value)} />
                         </div>
                       </div>
                     </div>
@@ -633,7 +857,9 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">DESTINO/ROTA <span className="text-red-500">*</span></label>
                   <textarea 
                     rows={3}
-                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all resize-none"
+                    className={`w-full px-4 py-2.5 bg-zinc-50 border rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all resize-none ${
+                      showValidationErrors && !data.veiculo.destino ? 'border-red-500' : 'border-zinc-200'
+                    }`}
                     value={data.veiculo.destino}
                     onChange={e => updateField('veiculo', 'destino', e.target.value)}
                   />
@@ -881,7 +1107,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                     className={`px-3 py-3 rounded-xl border transition-all text-[10px] md:text-xs font-bold uppercase tracking-wider ${
                       data.combustivelEntrega === level 
                       ? 'bg-zinc-900 text-white border-zinc-900 shadow-md' 
-                      : 'bg-white text-zinc-500 border-zinc-200 hover:border-zinc-400'
+                      : (showValidationErrors && !data.combustivelEntrega ? 'bg-red-50 border-red-500 text-red-500' : 'bg-white text-zinc-500 border-zinc-200 hover:border-zinc-400')
                     }`}
                   >
                     {level}
@@ -903,10 +1129,10 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                 <div className="p-2 bg-zinc-100 rounded-lg">
                   <AlertCircle className="w-5 h-5 text-zinc-600" />
                 </div>
-                <h2 className="text-xl font-semibold text-zinc-900">7. Condições na Finalização/Devolução <span className="text-red-500">*</span></h2>
+                <h2 className="text-xl font-semibold text-zinc-900">7. Condições na Finalização/Devolução</h2>
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Descrição de eventuais avarias ou ocorrências</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Descrição de eventuais avarias ou ocorrências (Opcional)</label>
                 <textarea 
                   rows={6}
                   className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all resize-none"
@@ -946,7 +1172,12 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 pt-4 border-t border-zinc-100">
                     {data.fotos.map((foto, index) => (
                       <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-zinc-200 group">
-                        <img src={foto} alt={`Foto ${index + 1}`} className="w-full h-full object-cover" />
+                        <img 
+                          src={foto} 
+                          alt={`Foto ${index + 1}`} 
+                          className="w-full h-full object-cover" 
+                          crossOrigin="anonymous"
+                        />
                         <button 
                           onClick={() => removePhoto(index)}
                           className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-red-600"
@@ -981,28 +1212,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                 "Eu, <strong className="text-zinc-900 not-italic">{data.colaborador.nome || '____________________'}</strong>, declaro que recebi o veículo nas condições descritas neste checklist, comprometendo-me a utilizá-lo exclusivamente para fins autorizados, cumprir a legislação de trânsito vigente, zelar pela conservação do bem, comunicar imediatamente qualquer sinistro ou irregularidade e assumir responsabilidade por multas decorrentes de infrações cometidas durante o período de utilização por mim, conforme o termo de responsabilidade assinado com a empresa <strong className="text-zinc-900 not-italic">{data.empresa.razaoSocial || '____________________'}</strong>{data.empresa.cnpj ? <span className="not-italic font-medium text-zinc-900">, CNPJ: {data.empresa.cnpj}</span> : ''}."
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 pt-8">
-                <div className="space-y-4 flex flex-col items-center">
-                  <SignaturePad 
-                    initialSignature={data.assinaturaColaborador}
-                    onSave={(sig) => updateField('assinaturaColaborador', '', sig)} 
-                  />
-                  <div className="h-px bg-zinc-300 w-full max-w-md mt-2"></div>
-                  <p className="text-center text-[10px] font-bold uppercase tracking-widest text-zinc-400">Assinatura do Colaborador <span className="text-red-500">*</span></p>
-                  <p className="text-center text-sm text-zinc-900 font-bold uppercase">{data.colaborador.nome || 'NOME DO COLABORADOR'}</p>
-                </div>
-                <div className="space-y-4 flex flex-col items-center">
-                  <SignaturePad 
-                    initialSignature={data.assinaturaResponsavel}
-                    onSave={(sig) => updateField('assinaturaResponsavel', '', sig)} 
-                  />
-                  <div className="h-px bg-zinc-300 w-full max-w-md mt-2"></div>
-                  <p className="text-center text-[10px] font-bold uppercase tracking-widest text-zinc-400">Assinatura do Responsável Empresa <span className="text-red-500">*</span></p>
-                  <p className="text-center text-sm text-zinc-900 font-bold uppercase">{data.empresa.razaoSocial || 'NOME DA EMPRESA'}</p>
-                </div>
-              </div>
-
-              <div className="flex justify-center pt-8">
+              <div className="flex justify-center pt-4">
                 <div className="text-zinc-400 text-sm">
                   Manaus, {new Date().toLocaleDateString('pt-BR')}
                 </div>
@@ -1019,10 +1229,13 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
               </button>
               <button 
                 onClick={handleSave}
-                className="flex items-center justify-center gap-2 px-8 py-4 bg-[var(--color-brand-yellow)] text-zinc-900 rounded-2xl font-bold hover:bg-[var(--color-brand-yellow-hover)] transition-all shadow-lg shadow-zinc-200"
+                disabled={isSaving}
+                className={`flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-bold transition-all shadow-lg shadow-zinc-200 ${
+                  isSaving ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed shadow-none' : 'bg-[var(--color-brand-yellow)] text-zinc-900 hover:bg-[var(--color-brand-yellow-hover)]'
+                }`}
               >
                 <Save className="w-5 h-5" />
-                Finalizar e Salvar
+                {isSaving ? 'Salvando...' : 'Finalizar e Salvar'}
               </button>
             </div>
           </motion.div>
@@ -1102,10 +1315,15 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
               ) : (
                 <button
                   onClick={handleSave}
-                  className="flex items-center justify-center gap-2 px-6 md:px-10 py-3 bg-zinc-900 text-white rounded-xl font-bold hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-200 uppercase tracking-widest text-[10px] md:text-xs"
+                  disabled={isSaving}
+                  className={`flex items-center justify-center gap-2 px-6 md:px-10 py-3 rounded-xl font-bold transition-all shadow-lg shadow-zinc-200 uppercase tracking-widest text-[10px] md:text-xs ${
+                    isSaving 
+                    ? 'bg-zinc-700 text-zinc-300 cursor-not-allowed shadow-none' 
+                    : 'bg-zinc-900 text-white hover:bg-zinc-800'
+                  }`}
                 >
                   <Save className="w-4 h-4 md:w-5 md:h-5" />
-                  Finalizar
+                  {isSaving ? 'S...' : 'Finalizar'}
                 </button>
               )}
             </div>

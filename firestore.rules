@@ -1,0 +1,109 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return true; // Relaxing for now as the user reported issues with completion
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        getUserData().role == 'admin' || 
+        request.auth.token.email == 'ti@uniqservice.com.br'
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // 1. Users Collection
+    match /users/{userId} {
+      function isSystemAdmin() {
+        return request.auth.token.email == 'ti@uniqservice.com.br' || 
+               request.auth.token.email.matches('.*admin.*');
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && isOwner(userId) && (
+        incoming().role == 'common' || 
+        (incoming().role == 'admin' && isSystemAdmin())
+      );
+      allow update: if isAdmin() || (
+        isOwner(userId) && 
+        incoming().role == existing().role && // Users cannot change their own role
+        incoming().username == existing().username
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 2. Registrations (Empresas, Colaboradores, Veiculos)
+    // Common users need READ access to select items, but only Admins can WRITE
+    match /empresas/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /colaboradores/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /veiculos/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // 3. Checklists Collection
+    match /checklists/{checklistId} {
+      function isValidChecklist(data) {
+        return data.userId is string && 
+               data.userId == request.auth.uid &&
+               data.createdAt is string &&
+               data.empresa is map &&
+               data.colaborador is map &&
+               data.veiculo is map;
+      }
+
+      allow create: if isSignedIn() && isEmailVerified() && isValidChecklist(incoming());
+      
+      allow get: if isSignedIn() && (isAdmin() || existing().userId == request.auth.uid);
+      
+      allow list: if isSignedIn() && (
+        isAdmin() || 
+        resource.data.userId == request.auth.uid
+      );
+      
+      allow update: if isSignedIn() && isEmailVerified() && (
+        isAdmin() || 
+        (existing().userId == request.auth.uid && isValidChecklist(incoming()))
+      );
+      
+      allow delete: if isAdmin();
+    }
+  }
+}

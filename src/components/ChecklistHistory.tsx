@@ -8,12 +8,14 @@ import {
   Calendar,
   Car,
   User as UserIcon,
+  Search,
+  Filter,
   FileDown,
   Eye
 } from 'lucide-react';
 import { ChecklistData } from '../types';
 import { db_firebase } from '../lib/firebase';
-import { collection, getDocs, query, where, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, deleteDoc, doc, limit, startAfter } from 'firebase/firestore';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -31,26 +33,54 @@ interface ChecklistHistoryProps {
 export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
   const [checklists, setChecklists] = useState<ChecklistRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [lastDoc, setLastDoc] = useState<any>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [dateFilter, setDateFilter] = useState({
+    start: '',
+    end: ''
+  });
 
-  const fetchChecklists = async () => {
+  const fetchChecklists = async (isLoadMore = false) => {
     try {
+      if (isLoadMore) setLoadingMore(true);
+      else setLoading(true);
+
       const userStr = localStorage.getItem('fleetcheck_user');
       const user = userStr ? JSON.parse(userStr) : null;
       
-      let q;
-      if (user?.role === 'admin') {
-        q = query(collection(db_firebase, 'checklists'), orderBy('createdAt', 'desc'));
-      } else {
-        q = query(
-          collection(db_firebase, 'checklists'), 
-          where('userId', '==', user?.id)
-        );
+      let constraints: any[] = [orderBy('createdAt', 'desc')];
+
+      if (user?.role !== 'admin') {
+        constraints.push(where('userId', '==', user?.id));
       }
 
+      if (dateFilter.start) {
+        constraints.push(where('createdAt', '>=', new Date(dateFilter.start).toISOString()));
+      }
+      if (dateFilter.end) {
+        const endDate = new Date(dateFilter.end);
+        endDate.setHours(23, 59, 59, 999);
+        constraints.push(where('createdAt', '<=', endDate.toISOString()));
+      }
+
+      if (isLoadMore && lastDoc) {
+        constraints.push(startAfter(lastDoc));
+      }
+
+      constraints.push(limit(15)); // Fetch 15 at a time
+
+      const q = query(collection(db_firebase, 'checklists'), ...constraints);
       const querySnapshot = await getDocs(q);
-      let records = querySnapshot.docs.map(doc => {
+      
+      const newLastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+      setLastDoc(newLastDoc);
+      setHasMore(querySnapshot.docs.length === 15);
+
+      const records = querySnapshot.docs.map(doc => {
         const data = doc.data() as any;
         return {
           id: doc.id,
@@ -60,27 +90,23 @@ export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
         };
       });
 
-      // Sort in memory if not already sorted by Firestore (for non-admin users)
-      if (user?.role !== 'admin') {
-        records.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      }
-
-      setChecklists(records);
-    } catch (err: any) {
-      console.error('Error fetching checklists from Firebase:', err);
-      if (err.code === 'permission-denied') {
-        setError('Erro de Permissão: O banco de dados Firestore está bloqueado. Verifique as regras no console.');
+      if (isLoadMore) {
+        setChecklists(prev => [...prev, ...records]);
       } else {
-        setError('Erro ao carregar histórico do Firebase. Verifique as regras.');
+        setChecklists(records);
       }
+    } catch (err: any) {
+      console.error('Error fetching history:', err);
+      setError('Erro ao carregar histórico.');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
   useEffect(() => {
     fetchChecklists();
-  }, []);
+  }, [dateFilter]);
 
   const handleDelete = async (id: string) => {
     if (deletingId !== id) {
@@ -246,16 +272,10 @@ export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
     const splitTermo = doc.splitTextToSize(termo, 180);
     doc.text(splitTermo, 14, y);
     
-    y += (splitTermo.length * 4) + 20;
-
-    // Signatures
-    doc.line(14, y, 90, y);
-    doc.line(120, y, 196, y);
-    y += 5;
+    y += (splitTermo.length * 4) + 15;
     doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Assinatura do Colaborador', 52, y, { align: 'center' });
-    doc.text('Assinatura do Responsável', 158, y, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Manaus, ${new Date().toLocaleDateString('pt-BR')}`, 105, y, { align: 'center' });
 
     if (mode === 'view') {
       window.open(doc.output('bloburl'), '_blank');
@@ -264,9 +284,16 @@ export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
     }
   };
 
-  const userStr = localStorage.getItem('fleetcheck_user');
-  const currentUser = userStr ? JSON.parse(userStr) : null;
-  const isAdmin = currentUser?.role === 'admin';
+  const filteredChecklists = checklists.filter(record => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      record.data.colaborador.nome.toLowerCase().includes(searchLower) ||
+      record.data.empresa.razaoSocial.toLowerCase().includes(searchLower) ||
+      record.data.veiculo.placa.toLowerCase().includes(searchLower) ||
+      record.data.veiculo.marcaModelo.toLowerCase().includes(searchLower) ||
+      (record.creator_name && record.creator_name.toLowerCase().includes(searchLower))
+    );
+  });
 
   if (loading) {
     return (
@@ -293,14 +320,53 @@ export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
         </div>
       )}
 
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="relative flex-1 max-w-md">
+          <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input 
+            type="text" 
+            placeholder="Buscar no histórico carregado..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 bg-white border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
+          />
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 bg-white border border-zinc-200 rounded-xl px-3 py-1.5 shadow-sm">
+            <Filter className="w-3.5 h-3.5 text-zinc-400" />
+            <input 
+              type="date" 
+              value={dateFilter.start}
+              onChange={e => setDateFilter(prev => ({ ...prev, start: e.target.value }))}
+              className="text-xs outline-none bg-transparent"
+            />
+            <span className="text-zinc-300">|</span>
+            <input 
+              type="date" 
+              value={dateFilter.end}
+              onChange={e => setDateFilter(prev => ({ ...prev, end: e.target.value }))}
+              className="text-xs outline-none bg-transparent"
+            />
+          </div>
+          <button 
+            onClick={() => setDateFilter({ start: '', end: '' })}
+            className="text-xs font-bold text-zinc-400 hover:text-zinc-900 transition-colors"
+          >
+            Limpar
+          </button>
+        </div>
+      </div>
+
       {checklists.length === 0 && !error ? (
         <div className="text-center py-20 bg-white rounded-3xl border border-zinc-200">
           <FileText className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
           <p className="text-zinc-500 font-medium">Nenhum checklist encontrado.</p>
         </div>
       ) : (
-        <div className="grid gap-4">
-          {checklists.map((record) => (
+        <>
+          <div className="grid gap-4">
+            {filteredChecklists.map((record) => (
             <div key={record.id} className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="space-y-4 flex-1">
                 <div className="flex items-center gap-4 text-sm text-zinc-500 font-medium">
@@ -388,7 +454,27 @@ export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
             </div>
           ))}
         </div>
-      )}
-    </div>
-  );
+
+        {hasMore && (
+          <div className="mt-8 flex justify-center">
+            <button
+              onClick={() => fetchChecklists(true)}
+              disabled={loadingMore}
+              className="flex items-center gap-2 px-8 py-3 bg-white border border-zinc-200 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-50 transition-all shadow-sm disabled:opacity-50"
+            >
+              {loadingMore ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Carregando...
+                </>
+              ) : (
+                'Carregar mais histórico'
+              )}
+            </button>
+          </div>
+        )}
+      </>
+    )}
+  </div>
+);
 }

@@ -146,7 +146,12 @@ export default function PrintView({ data }: PrintViewProps) {
             <div className="grid grid-cols-4 gap-2">
               {data.fotos.map((foto, index) => (
                 <div key={index} className="aspect-square border border-zinc-200">
-                  <img src={foto} alt={`Foto ${index + 1}`} className="w-full h-full object-cover" />
+                  <img 
+                    src={foto} 
+                    alt={`Foto ${index + 1}`} 
+                    className="w-full h-full object-cover" 
+                    crossOrigin="anonymous"
+                  />
                 </div>
               ))}
             </div>
@@ -161,23 +166,9 @@ export default function PrintView({ data }: PrintViewProps) {
           </p>
         </section>
 
-        {/* Assinaturas */}
-        <section className="pt-12 pb-8">
-          <div className="grid grid-cols-2 gap-12">
-            <div className="text-center">
-              <div className="border-t border-zinc-900 pt-2">
-                <p className="font-bold text-sm uppercase">Assinatura do Colaborador</p>
-                <p className="text-sm">{data.colaborador.nome || 'Nome do Colaborador'}</p>
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="border-t border-zinc-900 pt-2">
-                <p className="font-bold text-sm uppercase">Assinatura do Responsável</p>
-                <p className="text-sm">{data.empresa.razaoSocial || 'Nome da Empresa'}</p>
-              </div>
-            </div>
-          </div>
-          <div className="text-center mt-8 text-sm">
+        {/* Data e Local */}
+        <section className="pt-8 pb-8">
+          <div className="text-center text-sm font-medium">
             Manaus, {new Date().toLocaleDateString('pt-BR')}
           </div>
         </section>

@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System user profiles and roles",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "fullName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "common"] }
+      },
+      "required": ["username", "role"]
+    },
+    "Empresa": {
+      "title": "Empresa",
+      "description": "Company registration data",
+      "type": "object",
+      "properties": {
+        "razaoSocial": { "type": "string" },
+        "cnpj": { "type": "string" }
+      },
+      "required": ["razaoSocial", "cnpj"]
+    },
+    "Colaborador": {
+      "title": "Colaborador",
+      "description": "Collaborator registration data",
+      "type": "object",
+      "properties": {
+        "nome": { "type": "string" },
+        "cpf": { "type": "string" },
+        "cargo": { "type": "string" },
+        "cnh": { "type": "string" },
+        "validadeCnh": { "type": "string" }
+      },
+      "required": ["nome"]
+    },
+    "Veiculo": {
+      "title": "Veiculo",
+      "description": "Vehicle registration data",
+      "type": "object",
+      "properties": {
+        "marcaModelo": { "type": "string" },
+        "placa": { "type": "string" },
+        "renavam": { "type": "string" },
+        "cor": { "type": "string" },
+        "anoModelo": { "type": "string" }
+      },
+      "required": ["marcaModelo", "placa"]
+    },
+    "Checklist": {
+      "title": "Checklist",
+      "description": "Vehicle delivery/return checklist record",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "empresa": { "type": "object" },
+        "colaborador": { "type": "object" },
+        "veiculo": { "type": "object" },
+        "condicoesEntrega": { "type": "object" },
+        "acessorios": { "type": "object" },
+        "combustivelEntrega": { "type": "string" },
+        "condicoesDevolucao": { "type": "string" },
+        "fotos": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["userId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Stores user profiles and roles"
+    },
+    "/checklists/{checklistId}": {
+      "schema": "Checklist",
+      "description": "Stores vehicle checklist records"
+    },
+    "/empresas/{empresaId}": {
+      "schema": "Empresa",
+      "description": "Stores company data"
+    },
+    "/colaboradores/{colaboradorId}": {
+      "schema": "Colaborador",
+      "description": "Stores employee data"
+    },
+    "/veiculos/{veiculoId}": {
+      "schema": "Veiculo",
+      "description": "Stores vehicle data"
+    }
+  }
+}

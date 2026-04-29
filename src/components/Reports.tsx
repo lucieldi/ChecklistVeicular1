@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { ChecklistData } from '../types';
 import { db_firebase } from '../lib/firebase';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, limit, startAfter, Timestamp } from 'firebase/firestore';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -25,26 +25,54 @@ interface ChecklistRecord {
 export default function Reports() {
   const [checklists, setChecklists] = useState<ChecklistRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [lastDoc, setLastDoc] = useState<any>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [dateFilter, setDateFilter] = useState({
+    start: '',
+    end: ''
+  });
 
-  const fetchChecklists = async () => {
+  const fetchChecklists = async (isLoadMore = false) => {
     try {
+      if (isLoadMore) setLoadingMore(true);
+      else setLoading(true);
+
       const userStr = localStorage.getItem('fleetcheck_user');
       const user = userStr ? JSON.parse(userStr) : null;
       
-      let q;
-      if (user?.role === 'admin') {
-        q = query(collection(db_firebase, 'checklists'), orderBy('createdAt', 'desc'));
-      } else {
-        q = query(
-          collection(db_firebase, 'checklists'), 
-          where('userId', '==', user?.id)
-        );
+      let constraints: any[] = [orderBy('createdAt', 'desc')];
+
+      if (user?.role !== 'admin') {
+        constraints.push(where('userId', '==', user?.id));
       }
 
+      if (dateFilter.start) {
+        constraints.push(where('createdAt', '>=', new Date(dateFilter.start).toISOString()));
+      }
+      if (dateFilter.end) {
+        // Set end of day
+        const endDate = new Date(dateFilter.end);
+        endDate.setHours(23, 59, 59, 999);
+        constraints.push(where('createdAt', '<=', endDate.toISOString()));
+      }
+
+      if (isLoadMore && lastDoc) {
+        constraints.push(startAfter(lastDoc));
+      }
+
+      constraints.push(limit(20)); // Fetch 20 at a time to save credits
+
+      const q = query(collection(db_firebase, 'checklists'), ...constraints);
       const querySnapshot = await getDocs(q);
-      let records = querySnapshot.docs.map(doc => {
+      
+      const newLastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+      setLastDoc(newLastDoc);
+      setHasMore(querySnapshot.docs.length === 20);
+
+      const records = querySnapshot.docs.map(doc => {
         const data = doc.data() as any;
         return {
           id: doc.id,
@@ -54,27 +82,23 @@ export default function Reports() {
         };
       });
 
-      // Sort in memory if not already sorted by Firestore (for non-admin users)
-      if (user?.role !== 'admin') {
-        records.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      if (isLoadMore) {
+        setChecklists(prev => [...prev, ...records]);
+      } else {
+        setChecklists(records);
       }
-
-      setChecklists(records);
     } catch (err: any) {
       console.error('Error fetching reports from Firebase:', err);
-      if (err.code === 'permission-denied') {
-        setError('Erro de Permissão: O banco de dados Firestore está bloqueado. Verifique as regras no console.');
-      } else {
-        setError('Erro ao carregar relatórios do Firebase');
-      }
+      setError('Erro ao carregar relatórios. Verifique sua conexão ou permissões.');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
   useEffect(() => {
     fetchChecklists();
-  }, []);
+  }, [dateFilter]);
 
   const userStr = localStorage.getItem('fleetcheck_user');
   const currentUser = userStr ? JSON.parse(userStr) : null;
@@ -335,16 +359,10 @@ export default function Reports() {
     const splitTermo = doc.splitTextToSize(termo, 180);
     doc.text(splitTermo, 14, y);
     
-    y += (splitTermo.length * 4) + 20;
-
-    // Signatures
-    doc.line(14, y, 90, y);
-    doc.line(120, y, 196, y);
-    y += 5;
+    y += (splitTermo.length * 4) + 15;
     doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Assinatura do Colaborador', 52, y, { align: 'center' });
-    doc.text('Assinatura do Responsável', 158, y, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Manaus, ${new Date().toLocaleDateString('pt-BR')}`, 105, y, { align: 'center' });
 
     if (mode === 'view') {
       window.open(doc.output('bloburl'), '_blank');
@@ -406,19 +424,45 @@ export default function Reports() {
       )}
 
       <div className="bg-white rounded-3xl border border-zinc-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-zinc-200 bg-zinc-50 flex items-center gap-4">
-          <div className="relative flex-1 max-w-md">
+        <div className="p-4 border-b border-zinc-200 bg-zinc-50 flex flex-col lg:flex-row lg:items-center gap-4">
+          <div className="relative flex-1">
             <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input 
               type="text" 
-              placeholder="Buscar por colaborador, empresa, veículo ou placa..." 
+              placeholder="Buscar nos resultados carregados..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-white border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
             />
           </div>
-          <div className="text-sm text-zinc-500 font-medium">
-            {filteredChecklists.length} registro(s) encontrado(s)
+          
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 bg-white border border-zinc-200 rounded-xl px-3 py-1.5">
+              <Filter className="w-3.5 h-3.5 text-zinc-400" />
+              <input 
+                type="date" 
+                value={dateFilter.start}
+                onChange={e => setDateFilter(prev => ({ ...prev, start: e.target.value }))}
+                className="text-xs outline-none bg-transparent"
+              />
+              <span className="text-zinc-300">|</span>
+              <input 
+                type="date" 
+                value={dateFilter.end}
+                onChange={e => setDateFilter(prev => ({ ...prev, end: e.target.value }))}
+                className="text-xs outline-none bg-transparent"
+              />
+            </div>
+            <button 
+              onClick={() => setDateFilter({ start: '', end: '' })}
+              className="text-xs font-bold text-zinc-400 hover:text-zinc-900 transition-colors"
+            >
+              Limpar
+            </button>
+          </div>
+
+          <div className="text-sm text-zinc-500 font-medium whitespace-nowrap">
+            {filteredChecklists.length} registro(s)
           </div>
         </div>
 
@@ -493,6 +537,25 @@ export default function Reports() {
             </tbody>
           </table>
         </div>
+
+        {hasMore && (
+          <div className="p-4 border-t border-zinc-100 bg-zinc-50 flex justify-center">
+            <button
+              onClick={() => fetchChecklists(true)}
+              disabled={loadingMore}
+              className="flex items-center gap-2 px-6 py-2 bg-white border border-zinc-200 text-zinc-600 rounded-xl text-sm font-bold hover:bg-zinc-100 transition-all disabled:opacity-50"
+            >
+              {loadingMore ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Carregando...
+                </>
+              ) : (
+                'Carregar mais registros'
+              )}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

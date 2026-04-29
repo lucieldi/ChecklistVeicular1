@@ -35,6 +35,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [view, setView] = useState<'checklist' | 'history' | 'users' | 'registrations' | 'reports'>('checklist');
+  const [checklistKey, setChecklistKey] = useState(0);
   const [editingChecklistId, setEditingChecklistId] = useState<string | null>(null);
   const [editingChecklistData, setEditingChecklistData] = useState<ChecklistData | null>(null);
   const [initializing, setInitializing] = useState(true);
@@ -180,6 +181,7 @@ export default function App() {
                   setEditingChecklistId(null);
                   setEditingChecklistData(null);
                   setView('checklist');
+                  setChecklistKey(prev => prev + 1);
                 }}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
                   view === 'checklist' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'
@@ -267,10 +269,11 @@ export default function App() {
             >
               <div className="flex flex-col gap-2 p-2 bg-zinc-50 rounded-2xl border border-zinc-200">
                 <button 
-                  onClick={() => {
+                onClick={() => {
                     setEditingChecklistId(null);
                     setEditingChecklistData(null);
                     setView('checklist');
+                    setChecklistKey(prev => prev + 1);
                     setIsMenuOpen(false);
                   }}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
@@ -340,6 +343,7 @@ export default function App() {
         
         {!isPermissionError && view === 'checklist' && (
           <Checklist 
+            key={editingChecklistId || `new-${checklistKey}`}
             editingId={editingChecklistId} 
             initialData={editingChecklistData} 
             onFinish={handleFinishEdit}
