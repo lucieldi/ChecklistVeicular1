@@ -6,19 +6,38 @@
     <title>Sistema de Checklist</title>
     <script>
       // Suppress benign Vite WebSocket connection errors in this environment
+      const isBenignError = (err) => {
+        if (!err) return false;
+        const msg = err.message || (typeof err === 'string' ? err : '');
+        const stack = err.stack || '';
+        return (
+          msg.includes('WebSocket closed') ||
+          msg.includes('vite') ||
+          stack.includes('vite/dist/client')
+        );
+      };
+
       window.addEventListener('unhandledrejection', (event) => {
-        if (event.reason && (
-          event.reason.message === 'WebSocket closed without opened.' || 
-          (typeof event.reason === 'string' && event.reason.includes('vite')) ||
-          (event.reason.stack && event.reason.stack.includes('vite/dist/client'))
-        )) {
+        if (isBenignError(event.reason)) {
           event.preventDefault();
+          event.stopPropagation();
         }
-      });
-      // Also intercept console errors from Vite
+      }, true);
+
+      window.addEventListener('error', (event) => {
+        if (isBenignError(event.error) || isBenignError(event.message)) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }, true);
+
+      // Intercept console errors
       const originalError = console.error;
       console.error = function(...args) {
-        if (args[0] && typeof args[0] === 'string' && args[0].includes('[vite] failed to connect to websocket')) {
+        if (args[0] && typeof args[0] === 'string' && (
+          args[0].includes('[vite] failed to connect to websocket') ||
+          args[0].includes('WebSocket closed')
+        )) {
           return;
         }
         originalError.apply(console, args);
