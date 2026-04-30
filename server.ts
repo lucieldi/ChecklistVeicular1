@@ -105,26 +105,21 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Specific error handler for body-parser (to catch 'Payload Too Large' and return JSON)
+// Specific error handler for body-parser
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  if (err instanceof SyntaxError && 'body' in err) {
-    return res.status(400).json({ success: false, message: 'JSON Inválido' });
-  }
   if (err.type === 'entity.too.large') {
     return res.status(413).json({ success: false, message: 'A imagem é muito grande. O limite é 50MB.' });
   }
   next();
 });
 
-const apiRouter = express.Router();
-
 // Health check
-apiRouter.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.0.2' });
 });
 
 // Cloudinary Upload Endpoint
-apiRouter.post('/upload', async (req, res) => {
+app.post('/api/upload', async (req, res) => {
   const { image } = req.body;
   try {
     if (!image) {
@@ -154,11 +149,11 @@ apiRouter.post('/upload', async (req, res) => {
 // --- Registrations API ---
 
 // Empresas
-apiRouter.get('/empresas', async (req, res) => {
+app.get('/api/empresas', async (req, res) => {
   res.json(db.prepare('SELECT * FROM empresas').all());
 });
 
-apiRouter.post('/empresas', async (req, res) => {
+app.post('/api/empresas', async (req, res) => {
   const { razaoSocial, cnpj } = req.body;
   try {
     const result = db.prepare('INSERT INTO empresas (razaoSocial, cnpj) VALUES (?, ?)').run(razaoSocial, cnpj);
@@ -168,7 +163,7 @@ apiRouter.post('/empresas', async (req, res) => {
   }
 });
 
-apiRouter.put('/empresas/:id', async (req, res) => {
+app.put('/api/empresas/:id', async (req, res) => {
   const { razaoSocial, cnpj } = req.body;
   try {
     db.prepare('UPDATE empresas SET razaoSocial = ?, cnpj = ? WHERE id = ?').run(razaoSocial, cnpj, req.params.id);
@@ -178,7 +173,7 @@ apiRouter.put('/empresas/:id', async (req, res) => {
   }
 });
 
-apiRouter.delete('/empresas/:id', async (req, res) => {
+app.delete('/api/empresas/:id', async (req, res) => {
   try {
     db.prepare('DELETE FROM empresas WHERE id = ?').run(req.params.id);
     res.json({ success: true });
@@ -188,11 +183,11 @@ apiRouter.delete('/empresas/:id', async (req, res) => {
 });
 
 // Colaboradores
-apiRouter.get('/colaboradores', async (req, res) => {
+app.get('/api/colaboradores', async (req, res) => {
   res.json(db.prepare('SELECT * FROM colaboradores').all());
 });
 
-apiRouter.post('/colaboradores', async (req, res) => {
+app.post('/api/colaboradores', async (req, res) => {
   const { nome, cpf, cargo, cnh, validadeCnh } = req.body;
   try {
     const result = db.prepare('INSERT INTO colaboradores (nome, cpf, cargo, cnh, validadeCnh) VALUES (?, ?, ?, ?, ?)').run(nome, cpf, cargo, cnh, validadeCnh);
@@ -202,7 +197,7 @@ apiRouter.post('/colaboradores', async (req, res) => {
   }
 });
 
-apiRouter.put('/colaboradores/:id', async (req, res) => {
+app.put('/api/colaboradores/:id', async (req, res) => {
   const { nome, cpf, cargo, cnh, validadeCnh } = req.body;
   try {
     db.prepare('UPDATE colaboradores SET nome = ?, cpf = ?, cargo = ?, cnh = ?, validadeCnh = ? WHERE id = ?').run(nome, cpf, cargo, cnh, validadeCnh, req.params.id);
@@ -212,7 +207,7 @@ apiRouter.put('/colaboradores/:id', async (req, res) => {
   }
 });
 
-apiRouter.delete('/colaboradores/:id', async (req, res) => {
+app.delete('/api/colaboradores/:id', async (req, res) => {
   try {
     db.prepare('DELETE FROM colaboradores WHERE id = ?').run(req.params.id);
     res.json({ success: true });
@@ -222,11 +217,11 @@ apiRouter.delete('/colaboradores/:id', async (req, res) => {
 });
 
 // Veículos
-apiRouter.get('/veiculos', async (req, res) => {
+app.get('/api/veiculos', async (req, res) => {
   res.json(db.prepare('SELECT * FROM veiculos').all());
 });
 
-apiRouter.post('/veiculos', async (req, res) => {
+app.post('/api/veiculos', async (req, res) => {
   const { marcaModelo, placa, renavam, cor, anoModelo } = req.body;
   try {
     const result = db.prepare('INSERT INTO veiculos (marcaModelo, placa, renavam, cor, anoModelo) VALUES (?, ?, ?, ?, ?)').run(marcaModelo, placa, renavam, cor, anoModelo);
@@ -236,7 +231,7 @@ apiRouter.post('/veiculos', async (req, res) => {
   }
 });
 
-apiRouter.put('/veiculos/:id', async (req, res) => {
+app.put('/api/veiculos/:id', async (req, res) => {
   const { marcaModelo, placa, renavam, cor, anoModelo } = req.body;
   try {
     db.prepare('UPDATE veiculos SET marcaModelo = ?, placa = ?, renavam = ?, cor = ?, anoModelo = ? WHERE id = ?').run(marcaModelo, placa, renavam, cor, anoModelo, req.params.id);
@@ -246,7 +241,7 @@ apiRouter.put('/veiculos/:id', async (req, res) => {
   }
 });
 
-apiRouter.delete('/veiculos/:id', async (req, res) => {
+app.delete('/api/veiculos/:id', async (req, res) => {
   try {
     db.prepare('DELETE FROM veiculos WHERE id = ?').run(req.params.id);
     res.json({ success: true });
@@ -256,7 +251,7 @@ apiRouter.delete('/veiculos/:id', async (req, res) => {
 });
 
 // Checklists API
-apiRouter.post('/checklists', async (req, res) => {
+app.post('/api/checklists', async (req, res) => {
   const { userId, ...checklistData } = req.body;
   try {
     const data = JSON.stringify(checklistData);
@@ -267,7 +262,7 @@ apiRouter.post('/checklists', async (req, res) => {
   }
 });
 
-apiRouter.get('/checklists', async (req, res) => {
+app.get('/api/checklists', async (req, res) => {
   try {
     const checklists = db.prepare(`
       SELECT c.*, u.username as creator_name 
@@ -288,7 +283,7 @@ apiRouter.get('/checklists', async (req, res) => {
   }
 });
 
-apiRouter.get('/checklists/:id', async (req, res) => {
+app.get('/api/checklists/:id', async (req, res) => {
   const { id } = req.params;
   try {
     const checklist = db.prepare('SELECT * FROM checklists WHERE id = ?').get(id) as any;
@@ -306,7 +301,7 @@ apiRouter.get('/checklists/:id', async (req, res) => {
   }
 });
 
-apiRouter.put('/checklists/:id', async (req, res) => {
+app.put('/api/checklists/:id', async (req, res) => {
   const { id } = req.params;
   const checklistData = req.body;
   try {
@@ -318,7 +313,7 @@ apiRouter.put('/checklists/:id', async (req, res) => {
   }
 });
 
-apiRouter.delete('/checklists/:id', async (req, res) => {
+app.delete('/api/checklists/:id', async (req, res) => {
   const { id } = req.params;
   try {
     db.prepare('DELETE FROM checklists WHERE id = ?').run(id);
@@ -329,7 +324,7 @@ apiRouter.delete('/checklists/:id', async (req, res) => {
 });
 
 // Sync user from Firebase to SQLite
-apiRouter.post('/sync-user', async (req, res) => {
+app.post('/api/sync-user', async (req, res) => {
   const { id, username, role } = req.body;
   try {
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as any;
@@ -349,12 +344,12 @@ apiRouter.post('/sync-user', async (req, res) => {
 });
 
 // User Management API (Admin only)
-apiRouter.get('/users', async (req, res) => {
+app.get('/api/users', async (req, res) => {
   const users = db.prepare('SELECT id, username, role FROM users').all();
   res.json(users);
 });
 
-apiRouter.post('/users', async (req, res) => {
+app.post('/api/users', async (req, res) => {
   const { id, username, role } = req.body;
   try {
     db.prepare('INSERT INTO users (id, username, role) VALUES (?, ?, ?)').run(id, username, role);
@@ -364,13 +359,13 @@ apiRouter.post('/users', async (req, res) => {
   }
 });
 
-apiRouter.delete('/users/:id', async (req, res) => {
+app.delete('/api/users/:id', async (req, res) => {
   const { id } = req.params;
   db.prepare('DELETE FROM users WHERE id = ?').run(id);
   res.json({ success: true });
 });
 
-apiRouter.put('/users/:id', async (req, res) => {
+app.put('/api/users/:id', async (req, res) => {
   const { id } = req.params;
   const { username, role } = req.body;
   try {
@@ -381,16 +376,6 @@ apiRouter.put('/users/:id', async (req, res) => {
   }
 });
 
-// Final API 404 handler
-apiRouter.all('*', (req, res) => {
-  console.log(`API 404: ${req.method} ${req.originalUrl}`);
-  res.status(404).json({ 
-    success: false, 
-    message: `API Route ${req.method} ${req.originalUrl} not found` 
-  });
-});
-
-app.use('/api', apiRouter);
 
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
