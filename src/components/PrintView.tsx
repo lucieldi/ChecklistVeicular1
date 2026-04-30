@@ -146,12 +146,7 @@ export default function PrintView({ data }: PrintViewProps) {
             <div className="grid grid-cols-4 gap-2">
               {data.fotos.map((foto, index) => (
                 <div key={index} className="aspect-square border border-zinc-200">
-                  <img 
-                    src={foto} 
-                    alt={`Foto ${index + 1}`} 
-                    className="w-full h-full object-cover" 
-                    crossOrigin="anonymous"
-                  />
+                  <img src={foto} alt={`Foto ${index + 1}`} className="w-full h-full object-cover" />
                 </div>
               ))}
             </div>

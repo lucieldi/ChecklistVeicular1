@@ -21,9 +21,8 @@ import { ChecklistData } from '../types';
 import PrintView from './PrintView';
 import SignaturePad from './SignaturePad';
 import html2pdf from 'html2pdf.js';
-import { db_firebase, storage } from '../lib/firebase';
+import { db_firebase } from '../lib/firebase';
 import { collection, addDoc, updateDoc, doc, getDocs, query } from 'firebase/firestore';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 
 const defaultInitialData: ChecklistData = {
   empresa: { razaoSocial: '', razaoSocial2: '', cnpj: '', cnpj2: '', obs: '' },
@@ -75,7 +74,6 @@ interface ChecklistProps {
 }
 
 export default function Checklist({ editingId, initialData, onFinish }: ChecklistProps) {
-  const [isSaving, setIsSaving] = useState(false);
   const [data, setData] = useState<ChecklistData>(initialData || defaultInitialData);
   const [step, setStep] = useState(1);
   const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
@@ -224,43 +222,13 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
     if (!files) return;
 
     Array.from(files).forEach(file => {
-      // Compress image before adding to state
       const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-
-          // Max dimension 800px to keep size low
-          const MAX_SIZE = 800;
-          if (width > height) {
-            if (width > MAX_SIZE) {
-              height *= MAX_SIZE / width;
-              width = MAX_SIZE;
-            }
-          } else {
-            if (height > MAX_SIZE) {
-              width *= MAX_SIZE / height;
-              height = MAX_SIZE;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-
-          // Quality 0.6 is a good balance for documentation
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.6);
-          
-          setData(prev => ({
-            ...prev,
-            fotos: [...(prev.fotos || []), compressedDataUrl]
-          }));
-        };
-        img.src = event.target?.result as string;
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setData(prev => ({
+          ...prev,
+          fotos: [...(prev.fotos || []), base64String]
+        }));
       };
       reader.readAsDataURL(file);
     });
@@ -359,9 +327,6 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
       if (!validateStep(i)) return;
     }
     
-    setIsSaving(true);
-    setSaveStatus({ type: 'success', message: 'Processando fotos e salvando...' });
-
     try {
       const userStr = localStorage.getItem('fleetcheck_user');
       const user = userStr ? JSON.parse(userStr) : null;
@@ -369,38 +334,11 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
       if (!user?.id) {
         throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
       }
-
-      // Upload photos to Firebase Storage if they are base64
-      const uploadedFotosUrls: string[] = [];
-      const currentFotos = data.fotos || [];
-
-      for (let i = 0; i < currentFotos.length; i++) {
-        const foto = currentFotos[i];
-        if (foto.startsWith('data:image')) {
-          // New photo in base64, needs upload
-          const fileName = `checklists/${user.id}/${Date.now()}-${i}.jpg`;
-          const storageRef = ref(storage, fileName);
-          
-          try {
-            await uploadString(storageRef, foto, 'data_url');
-            const downloadUrl = await getDownloadURL(storageRef);
-            uploadedFotosUrls.push(downloadUrl);
-          } catch (uploadError: any) {
-            console.error('Error uploading photo:', uploadError);
-            throw new Error(`Erro ao enviar foto ${i + 1}: ${uploadError.message}`);
-          }
-        } else {
-          // Already a URL
-          uploadedFotosUrls.push(foto);
-        }
-      }
       
       const checklistData = {
         ...data,
-        fotos: uploadedFotosUrls,
         userId: user.id,
-        updatedAt: new Date().toISOString(),
-        createdAt: data.createdAt || new Date().toISOString()
+        createdAt: new Date().toISOString()
       };
 
       try {
@@ -443,9 +381,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
     } catch (error: any) {
       console.error('Save setup error:', error);
       setSaveStatus({ type: 'error', message: error.message || 'Erro ao processar salvamento.' });
-      setTimeout(() => setSaveStatus(null), 5000);
-    } finally {
-      setIsSaving(false);
+      setTimeout(() => setSaveStatus(null), 3000);
     }
   };
 
@@ -1172,12 +1108,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 pt-4 border-t border-zinc-100">
                     {data.fotos.map((foto, index) => (
                       <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-zinc-200 group">
-                        <img 
-                          src={foto} 
-                          alt={`Foto ${index + 1}`} 
-                          className="w-full h-full object-cover" 
-                          crossOrigin="anonymous"
-                        />
+                        <img src={foto} alt={`Foto ${index + 1}`} className="w-full h-full object-cover" />
                         <button 
                           onClick={() => removePhoto(index)}
                           className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-red-600"
@@ -1229,13 +1160,10 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
               </button>
               <button 
                 onClick={handleSave}
-                disabled={isSaving}
-                className={`flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-bold transition-all shadow-lg shadow-zinc-200 ${
-                  isSaving ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed shadow-none' : 'bg-[var(--color-brand-yellow)] text-zinc-900 hover:bg-[var(--color-brand-yellow-hover)]'
-                }`}
+                className="flex items-center justify-center gap-2 px-8 py-4 bg-[var(--color-brand-yellow)] text-zinc-900 rounded-2xl font-bold hover:bg-[var(--color-brand-yellow-hover)] transition-all shadow-lg shadow-zinc-200"
               >
                 <Save className="w-5 h-5" />
-                {isSaving ? 'Salvando...' : 'Finalizar e Salvar'}
+                Finalizar e Salvar
               </button>
             </div>
           </motion.div>
@@ -1315,15 +1243,10 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
               ) : (
                 <button
                   onClick={handleSave}
-                  disabled={isSaving}
-                  className={`flex items-center justify-center gap-2 px-6 md:px-10 py-3 rounded-xl font-bold transition-all shadow-lg shadow-zinc-200 uppercase tracking-widest text-[10px] md:text-xs ${
-                    isSaving 
-                    ? 'bg-zinc-700 text-zinc-300 cursor-not-allowed shadow-none' 
-                    : 'bg-zinc-900 text-white hover:bg-zinc-800'
-                  }`}
+                  className="flex items-center justify-center gap-2 px-6 md:px-10 py-3 bg-zinc-900 text-white rounded-xl font-bold hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-200 uppercase tracking-widest text-[10px] md:text-xs"
                 >
                   <Save className="w-4 h-4 md:w-5 md:h-5" />
-                  {isSaving ? 'S...' : 'Finalizar'}
+                  Finalizar
                 </button>
               )}
             </div>
