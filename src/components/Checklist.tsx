@@ -217,20 +217,57 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
     }
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
-    Array.from(files).forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
+    for (const file of Array.from(files)) {
+      try {
+        const base64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+
+        // Compress image before adding to state
+        const compressed = await compressImage(base64);
         setData(prev => ({
           ...prev,
-          fotos: [...(prev.fotos || []), base64String]
+          fotos: [...(prev.fotos || []), compressed]
         }));
+      } catch (err) {
+        console.error('Erro ao processar imagem:', err);
+      }
+    }
+  };
+
+  const compressImage = (base64: string, maxWidth = 1200): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = base64;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(base64);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
       };
-      reader.readAsDataURL(file);
+      img.onerror = () => resolve(base64);
     });
   };
 
@@ -327,6 +364,8 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
       if (!validateStep(i)) return;
     }
     
+    setSaveStatus({ type: 'success', message: 'Salvando e enviando fotos para o Cloudinary... Por favor, aguarde.' });
+    
     try {
       const userStr = localStorage.getItem('fleetcheck_user');
       const user = userStr ? JSON.parse(userStr) : null;
@@ -334,10 +373,58 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
       if (!user?.id) {
         throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
       }
+
+      // 1. Upload photos to Cloudinary if they are new (base64)
+      const urlsFotos: string[] = [];
+      const currentFotos = data.fotos || [];
+
+      for (const foto of currentFotos) {
+        if (foto.startsWith('http')) {
+          urlsFotos.push(foto);
+        } else if (foto.startsWith('data:image')) {
+          try {
+            const response = await fetch('/api/upload', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ image: foto }),
+            });
+
+            const text = await response.text();
+            let cloudData;
+            
+            try {
+              cloudData = JSON.parse(text);
+            } catch (parseErr) {
+              console.error('Falha ao processar resposta do servidor:', text.substring(0, 200));
+              if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+                if (response.status === 413) {
+                  throw new Error('A imagem é muito grande para o servidor. Tente uma foto menor.');
+                }
+                throw new Error(`Erro do servidor (${response.status}). O servidor retornou uma página HTML em vez de dados.`);
+              }
+              throw new Error(`Resposta inválida do servidor (${response.status})`);
+            }
+
+            if (!response.ok || !cloudData.success) {
+              console.error('Erro no servidor de upload:', cloudData);
+              const errorMsg = cloudData.message || (cloudData.details ? JSON.stringify(cloudData.details) : 'Erro desconhecido');
+              throw new Error(errorMsg);
+            }
+
+            urlsFotos.push(cloudData.secure_url);
+          } catch (uploadErr: any) {
+            console.error('Falha no upload:', uploadErr);
+            throw new Error(`Upload Falhou: ${uploadErr.message}`);
+          }
+        }
+      }
       
       const checklistData = {
         ...data,
+        fotos: urlsFotos,
         userId: user.id,
+        usuarioEmail: user.username || "ti@uniqservice.com.br",
+        dataCriacao: new Date(),
         createdAt: new Date().toISOString()
       };
 
@@ -371,10 +458,10 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
         if (error.code === 'permission-denied') {
           setSaveStatus({ 
             type: 'error', 
-            message: 'Erro de Permissão: Verifique se suas regras do Firestore permitem escrita para usuários comuns.' 
+            message: 'Erro de Permissão: Verifique suas regras do Firestore.' 
           });
         } else {
-          setSaveStatus({ type: 'error', message: `Erro ao salvar: ${error.message || 'Erro desconhecido'}` });
+          setSaveStatus({ type: 'error', message: `Erro ao salvar checklist: ${error.message}` });
         }
         setTimeout(() => setSaveStatus(null), 5000);
       }

@@ -364,6 +364,42 @@ export default function Reports() {
     doc.setFont('helvetica', 'normal');
     doc.text(`Manaus, ${new Date().toLocaleDateString('pt-BR')}`, 105, y, { align: 'center' });
 
+    // Photos Section in PDF
+    if (data.fotos && data.fotos.length > 0) {
+      doc.addPage();
+      y = 20;
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Fotos Anexas', 105, y, { align: 'center' });
+      y += 15;
+
+      const photoSize = 80;
+      const margin = 15;
+      const photosPerRow = 2;
+      
+      for (let i = 0; i < data.fotos.length; i++) {
+        if (i > 0 && i % 4 === 0) {
+          doc.addPage();
+          y = 20;
+        }
+        
+        const row = Math.floor((i % 4) / photosPerRow);
+        const col = i % photosPerRow;
+        
+        const xPos = margin + col * (photoSize + 10);
+        const yPos = y + row * (photoSize + 10);
+
+        try {
+          // Cloudinary images allow cross-origin
+          doc.addImage(data.fotos[i], 'JPEG', xPos, yPos, photoSize, photoSize);
+        } catch (err) {
+          console.error("Error adding photo to PDF", err);
+          doc.setFontSize(8);
+          doc.text("Erro ao carregar foto", xPos, yPos + 5);
+        }
+      }
+    }
+
     if (mode === 'view') {
       window.open(doc.output('bloburl'), '_blank');
     } else {

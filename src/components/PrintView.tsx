@@ -141,12 +141,20 @@ export default function PrintView({ data }: PrintViewProps) {
 
         {/* Fotos */}
         {data.fotos && data.fotos.length > 0 && (
-          <section>
-            <h2 className="font-bold text-lg border-b border-zinc-200 mb-2 pb-1">Fotos do Veículo</h2>
-            <div className="grid grid-cols-4 gap-2">
+          <section className="break-before-page pt-4">
+            <h2 className="font-bold text-lg border-b border-zinc-200 mb-4 pb-1">Fotos do Veículo</h2>
+            <div className="grid grid-cols-2 gap-4">
               {data.fotos.map((foto, index) => (
-                <div key={index} className="aspect-square border border-zinc-200">
-                  <img src={foto} alt={`Foto ${index + 1}`} className="w-full h-full object-cover" />
+                <div key={index} className="break-inside-avoid border border-zinc-200 rounded-lg overflow-hidden bg-zinc-50">
+                  <img 
+                    src={foto} 
+                    alt={`Foto ${index + 1}`} 
+                    className="w-full h-48 object-cover" 
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="bg-zinc-100 py-1 px-2 text-[10px] text-zinc-500 text-center border-t border-zinc-200">
+                    Foto Ref. #{index + 1}
+                  </div>
                 </div>
               ))}
             </div>

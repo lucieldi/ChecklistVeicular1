@@ -277,6 +277,42 @@ export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
     doc.setFont('helvetica', 'normal');
     doc.text(`Manaus, ${new Date().toLocaleDateString('pt-BR')}`, 105, y, { align: 'center' });
 
+    // Photos Section in PDF
+    if (data.fotos && data.fotos.length > 0) {
+      doc.addPage();
+      y = 20;
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Fotos Anexas', 105, y, { align: 'center' });
+      y += 15;
+
+      const photoSize = 80;
+      const margin = 15;
+      const photosPerRow = 2;
+      
+      for (let i = 0; i < data.fotos.length; i++) {
+        if (i > 0 && i % 4 === 0) {
+          doc.addPage();
+          y = 20;
+        }
+        
+        const row = Math.floor((i % 4) / photosPerRow);
+        const col = i % photosPerRow;
+        
+        const xPos = margin + col * (photoSize + 10);
+        const yPos = y + row * (photoSize + 10);
+
+        try {
+          // Cloudinary images allow cross-origin
+          doc.addImage(data.fotos[i], 'JPEG', xPos, yPos, photoSize, photoSize);
+        } catch (err) {
+          console.error("Error adding photo to PDF", err);
+          doc.setFontSize(8);
+          doc.text("Erro ao carregar foto", xPos, yPos + 5);
+        }
+      }
+    }
+
     if (mode === 'view') {
       window.open(doc.output('bloburl'), '_blank');
     } else {
@@ -411,6 +447,21 @@ export default function ChecklistHistory({ onEdit }: ChecklistHistoryProps) {
                   <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-100">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Condições na Devolução</p>
                     <p className="text-xs text-zinc-600 italic">{record.data.condicoesDevolucao}</p>
+                  </div>
+                )}
+
+                {record.data.fotos && record.data.fotos.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    {record.data.fotos.map((foto, idx) => (
+                      <div key={idx} className="w-16 h-16 rounded-lg overflow-hidden border border-zinc-200 bg-zinc-100 flex-shrink-0">
+                        <img 
+                          src={foto} 
+                          alt="Foto do Checklist" 
+                          className="w-full h-full object-cover cursor-pointer hover:scale-110 transition-transform" 
+                          onClick={() => window.open(foto, '_blank')}
+                        />
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

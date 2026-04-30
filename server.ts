@@ -2,8 +2,23 @@ import express from 'express';
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { v2 as cloudinary } from 'cloudinary';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Cloudinary Configuration
+const cloudName = 'djeca9ngr';
+const apiKey = '327899453725446';
+const apiSecret = 'Yd_W7W4eORYMqx6ucJiczSg_2FU';
+
+cloudinary.config({
+  cloud_name: cloudName,
+  api_key: apiKey,
+  api_secret: apiSecret,
+  secure: true
+});
+
+console.log(`Cloudinary configurado para: ${cloudName}`);
 
 const dbPath = path.join(__dirname, 'database.db');
 console.log(`Using database at: ${dbPath}`);
@@ -83,11 +98,52 @@ if (veiculosCount.count === 0) {
 }
 
 export const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Specific error handler for body-parser (to catch 'Payload Too Large' and return JSON)
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err instanceof SyntaxError && 'body' in err) {
+    return res.status(400).json({ success: false, message: 'JSON Inválido' });
+  }
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ success: false, message: 'A imagem é muito grande. O limite é 50MB.' });
+  }
+  next();
+});
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Cloudinary Upload Endpoint
+app.post('/api/upload', async (req, res) => {
+  const { image } = req.body;
+  try {
+    if (!image) {
+      return res.status(400).json({ success: false, message: 'Nenhuma imagem enviada' });
+    }
+
+    const uploadResponse = await cloudinary.uploader.upload(image, {
+      folder: 'checklists',
+      resource_type: 'auto',
+    });
+
+    res.json({ 
+      success: true, 
+      secure_url: uploadResponse.secure_url,
+      public_id: uploadResponse.public_id 
+    });
+  } catch (error: any) {
+    console.error('Erro detalhado Cloudinary:', error);
+    // Retorna o erro específico do Cloudinary para facilitar o diagnóstico
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Falha no upload para nuvem',
+      details: error
+    });
+  }
 });
 
 // --- Registrations API (Empresas, Colaboradores, Veículos) ---
