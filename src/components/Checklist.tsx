@@ -374,7 +374,7 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
         throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
       }
 
-      // 1. Upload photos to Cloudinary if they are new (base64)
+      // 1. Upload photos to Cloudinary
       const urlsFotos: string[] = [];
       const currentFotos = data.fotos || [];
 
@@ -383,38 +383,45 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
           urlsFotos.push(foto);
         } else if (foto.startsWith('data:image')) {
           try {
+            // Tenta primeiro o upload pelo nosso próprio servidor (mais seguro)
+            console.log('Tentando upload pelo servidor local...');
             const response = await fetch('/api/upload', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ image: foto }),
             });
 
-            const text = await response.text();
-            let cloudData;
-            
-            try {
-              cloudData = JSON.parse(text);
-            } catch (parseErr) {
-              console.error('Falha ao processar resposta do servidor:', text.substring(0, 200));
-              if (text.includes('<!DOCTYPE') || text.includes('<html')) {
-                if (response.status === 413) {
-                  throw new Error('A imagem é muito grande para o servidor. Tente uma foto menor.');
-                }
-                throw new Error(`Erro do servidor (${response.status}). O servidor retornou uma página HTML em vez de dados.`);
+            if (response.ok) {
+              const cloudData = await response.json();
+              if (cloudData.success && cloudData.secure_url) {
+                urlsFotos.push(cloudData.secure_url);
+                continue; // Sucesso, vai para a próxima foto
               }
-              throw new Error(`Resposta inválida do servidor (${response.status})`);
             }
 
-            if (!response.ok || !cloudData.success) {
-              console.error('Erro no servidor de upload:', cloudData);
-              const errorMsg = cloudData.message || (cloudData.details ? JSON.stringify(cloudData.details) : 'Erro desconhecido');
-              throw new Error(errorMsg);
+            // Se o servidor local falhar (404, 500, etc), tenta direto no Cloudinary
+            console.warn(`Servidor local falhou (Status: ${response.status}), tentando upload direto...`);
+            
+            const formData = new FormData();
+            formData.append('file', foto);
+            formData.append('upload_preset', 'ml_default');
+            formData.append('folder', 'checklists');
+
+            const directResponse = await fetch("https://api.cloudinary.com/v1_1/djec9ngr/image/upload", {
+              method: "POST",
+              body: formData
+            });
+
+            if (!directResponse.ok) {
+              const errorText = await directResponse.text();
+              throw new Error(`Cloudinary Direct Error (${directResponse.status}): ${errorText.substring(0, 100)}`);
             }
 
+            const cloudData = await directResponse.json();
             urlsFotos.push(cloudData.secure_url);
           } catch (uploadErr: any) {
-            console.error('Falha no upload:', uploadErr);
-            throw new Error(`Upload Falhou: ${uploadErr.message}`);
+            console.error('Falha crítica em ambas as tentativas de upload:', uploadErr);
+            throw new Error(`Falha no upload da foto: ${uploadErr.message}`);
           }
         }
       }
@@ -604,114 +611,78 @@ export default function Checklist({ editingId, initialData, onFinish }: Checklis
               </div>
             </section>
 
-            <section className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-zinc-100 rounded-lg">
-                  <User className="w-5 h-5 text-zinc-600" />
-                </div>
-                <h2 className="text-xl font-semibold text-zinc-900">2. Identificação do Colaborador</h2>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5 md:col-span-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">NOME COMPLETO <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <input 
-                      list="colaboradores-list"
-                      className={`w-full px-4 py-2.5 bg-zinc-50 border rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all pr-10 ${
-                        showValidationErrors && !data.colaborador.nome ? 'border-red-500' : 'border-zinc-200'
-                      }`}
-                      value={data.colaborador.nome}
-                      onChange={e => {
-                        const val = e.target.value;
-                        const collab = colaboradores.find(c => c.nome === val);
-                        if (collab) {
-                          setData(prev => ({
-                            ...prev,
-                            colaborador: {
-                              id: collab.id,
-                              nome: collab.nome || '',
-                              cpf: collab.cpf || '',
-                              cargo: collab.cargo || '',
-                              cnh: collab.cnh || '',
-                              validadeCnh: collab.validadeCnh || ''
-                            }
-                          }));
-                        } else {
-                          updateField('colaborador', 'nome', val);
-                        }
-                      }}
-                      placeholder="Nome do colaborador"
-                    />
-                    {data.colaborador.nome && (
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          setData(prev => ({
-                            ...prev,
-                            colaborador: {
-                              id: undefined,
-                              nome: '',
-                              cpf: '',
-                              cargo: '',
-                              cnh: '',
-                              validadeCnh: ''
-                            }
-                          }));
-                        }}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 p-1"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    )}
+            <section className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm transition-all hover:shadow-md">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-50 rounded-lg">
+                    <User className="w-5 h-5 text-blue-600" />
                   </div>
-                  <datalist id="colaboradores-list">
-                    {colaboradores.map(c => (
-                      <option key={c.id} value={c.nome}>{c.cargo} - {c.cpf}</option>
-                    ))}
-                  </datalist>
+                  <h2 className="text-xl font-semibold text-zinc-900">2. Identificação do Colaborador</h2>
+                </div>
+                {data.colaborador.nome && (
+                  <div className="flex items-center gap-2 px-3 py-1 bg-green-50 text-green-700 rounded-full text-[10px] font-bold uppercase tracking-wider border border-green-100">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Identificado via Login
+                  </div>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-2">
+                    Nome Completo <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    type="text" 
+                    readOnly
+                    className={`w-full px-4 py-3 bg-zinc-50 border rounded-xl outline-none transition-all font-semibold text-zinc-900 cursor-default ${
+                      showValidationErrors && !data.colaborador.nome ? 'border-red-500' : 'border-zinc-200'
+                    }`}
+                    value={data.colaborador.nome}
+                    placeholder="Aguardando identificação..."
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">CPF <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
-                    className={`w-full px-4 py-2.5 bg-zinc-50 border rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all ${
+                    readOnly
+                    className={`w-full px-4 py-3 bg-zinc-50 border rounded-xl outline-none transition-all text-zinc-700 cursor-default ${
                       showValidationErrors && !data.colaborador.cpf ? 'border-red-500' : 'border-zinc-200'
                     }`}
                     value={data.colaborador.cpf}
-                    onChange={e => updateField('colaborador', 'cpf', e.target.value)}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">CARGO <span className="text-red-500">*</span></label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Cargo <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
-                    className={`w-full px-4 py-2.5 bg-zinc-50 border rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all ${
+                    readOnly
+                    className={`w-full px-4 py-3 bg-zinc-50 border rounded-xl outline-none transition-all text-zinc-700 cursor-default ${
                       showValidationErrors && !data.colaborador.cargo ? 'border-red-500' : 'border-zinc-200'
                     }`}
                     value={data.colaborador.cargo}
-                    onChange={e => updateField('colaborador', 'cargo', e.target.value)}
                   />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">CNH Nº <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
-                    className={`w-full px-4 py-2.5 bg-zinc-50 border rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all ${
+                    readOnly
+                    className={`w-full px-4 py-3 bg-zinc-50 border rounded-xl outline-none transition-all text-zinc-700 cursor-default ${
                       showValidationErrors && !data.colaborador.cnh ? 'border-red-500' : 'border-zinc-200'
                     }`}
                     value={data.colaborador.cnh}
-                    onChange={e => updateField('colaborador', 'cnh', e.target.value)}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">VALIDADE <span className="text-red-500">*</span></label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Validade CNH <span className="text-red-500">*</span></label>
                   <input 
                     type="date" 
-                    className={`w-full px-4 py-2.5 bg-zinc-50 border rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all ${
+                    readOnly
+                    className={`w-full px-4 py-3 bg-zinc-50 border rounded-xl outline-none transition-all text-zinc-700 cursor-default ${
                       showValidationErrors && !data.colaborador.validadeCnh ? 'border-red-500' : 'border-zinc-200'
                     }`}
                     value={data.colaborador.validadeCnh}
-                    onChange={e => updateField('colaborador', 'validadeCnh', e.target.value)}
                   />
                 </div>
               </div>

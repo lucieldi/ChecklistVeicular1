@@ -7,7 +7,7 @@ import { v2 as cloudinary } from 'cloudinary';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Cloudinary Configuration
-const cloudName = 'djeca9ngr';
+const cloudName = 'djec9ngr';
 const apiKey = '327899453725446';
 const apiSecret = 'Yd_W7W4eORYMqx6ucJiczSg_2FU';
 
@@ -99,15 +99,17 @@ if (veiculosCount.count === 0) {
 
 const app = express();
 
-// Simple logger to see all requests
+// 1. Simple logger to see all requests and their destinations
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - [${req.method}] ${req.url}`);
   next();
 });
 
+// 2. Body parsers
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// 3. API Router Setup
 const apiRouter = express.Router();
 
 // Specific error handler for body-parser to catch 'Payload Too Large'
@@ -119,32 +121,39 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   next(err);
 });
 
+// Mount the API Router EARLY
+app.use('/api', apiRouter);
+
 // Health check
 apiRouter.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.0.4' });
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.0.5' });
 });
 
 // Cloudinary Upload Endpoint
 apiRouter.post('/upload', async (req, res) => {
   const { image } = req.body;
-  console.log(`Upload request received. Image size: ${image ? Math.round(image.length / 1024) : 0} KB`);
+  const imageSize = image ? Math.round(image.length / 1024) : 0;
+  console.log(`[API] Upload request received. Size: ${imageSize} KB`);
   
   try {
     if (!image) {
+      console.warn('[API] No image data in request');
       return res.status(400).json({ success: false, message: 'Nenhuma imagem enviada' });
     }
 
-    // Ensure it's a data URL or valid string
     if (!image.startsWith('data:image')) {
+       console.warn('[API] Invalid image format (not data:image)');
        return res.status(400).json({ success: false, message: 'Formato de imagem inválido' });
     }
 
+    console.log(`[API] Sending to Cloudinary (Cloud: ${cloudName})...`);
     const uploadResponse = await cloudinary.uploader.upload(image, {
       folder: 'checklists',
-      resource_type: 'image', // Changed auto to image to be safe
+      resource_type: 'image',
+      upload_preset: 'ml_default',
     });
 
-    console.log('Upload success:', uploadResponse.secure_url);
+    console.log('[API] Cloudinary upload success:', uploadResponse.secure_url);
 
     res.json({ 
       success: true, 
@@ -152,7 +161,7 @@ apiRouter.post('/upload', async (req, res) => {
       public_id: uploadResponse.public_id 
     });
   } catch (error: any) {
-    console.error('Erro detalhado Cloudinary:', error);
+    console.error('[API] Erro detalhado Cloudinary:', error);
     res.status(500).json({ 
       success: false, 
       message: error.message || 'Falha no upload para nuvem',
@@ -402,8 +411,6 @@ apiRouter.all('*', (req, res) => {
     suggestion: 'Verifique se o prefixo /api está correto'
   });
 });
-
-app.use('/api', apiRouter);
 
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
